@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - MONGO_URI=mongodb://mongo:27017/work-finder
+      - JWT_ACCESS_KEY=work-finder-access-secret-key-2024
+      - JWT_ACCESS_EXPIRE=1d
+      - JWT_REFRESH_KEY=work-finder-refresh-secret-key-2024
+      - JWT_REFRESH_EXPIRE=7d
+    depends_on:
+      - mongo
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./public:/app/public
+
+  mongo:
+    image: mongo:7.0
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=work-finder
+
+volumes:
+  mongo_data:
