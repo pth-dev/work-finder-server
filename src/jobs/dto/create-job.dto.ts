@@ -1,82 +1,81 @@
-import { Transform, Type } from "class-transformer";
-import { IsArray, IsBoolean, IsDate, IsNotEmpty, IsNotEmptyObject, IsObject, IsString, ValidateNested } from "class-validator";
-import mongoose from "mongoose";
-class Company {
-    @IsNotEmpty()
-    _id: mongoose.Schema.Types.ObjectId;
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  MaxLength,
+} from 'class-validator';
+import { JobType } from '../../common/enums/job-type.enum';
+import { JobStatus } from '../../common/enums/job-status.enum';
 
-    @IsNotEmpty()
-    name: string;
-
-    @IsNotEmpty()
-    logo:string
-}
 export class CreateJobDto {
+  @ApiProperty({
+    example: 1,
+    description: 'Company ID that posts this job',
+  })
+  @IsNotEmpty()
+  @IsNumber()
+  company_id: number;
 
-    @IsNotEmpty({
-        message: "Name cannot be empty"
-    })
-    name: string;
-    
-    @IsNotEmpty({
-        message: "Skill cannot be empty"
-    })
-    @IsArray({ message: "Skill must be a Araay" })
-    @IsString({ each: true, message: "Skill must be a String" })
-    skills: string[];
+  @ApiProperty({
+    example: 'Senior Software Engineer',
+    description: 'Job title',
+    maxLength: 200,
+  })
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(200)
+  job_title: string;
 
-    @IsNotEmptyObject()
-    @IsObject()
-    @ValidateNested()
-    @Type(() => Company)
-    company: Company
+  @ApiProperty({
+    example: 'We are looking for an experienced software engineer...',
+    description: 'Job description',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
 
-    @IsNotEmpty({
-        message: "Location cannot be empty"
-    })
-    location: string;
+  @ApiProperty({
+    example: 'San Francisco, CA',
+    description: 'Job location',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  location?: string;
 
+  @ApiProperty({
+    example: '$80,000 - $120,000',
+    description: 'Salary range',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  salary?: string;
 
-    @IsNotEmpty({
-        message: "Salary cannot be empty"
-    })
-    salary: number;
+  @ApiProperty({
+    example: JobType.FULL_TIME,
+    description: 'Job type',
+    enum: JobType,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(JobType)
+  job_type?: JobType;
 
-
-    @IsNotEmpty({
-        message: "Quantity cannot be empty"
-    })
-    quantity: number;
-
-
-    @IsNotEmpty({
-        message: "Level cannot be empty"
-    })
-    level: string;
-
-
-    @IsNotEmpty({
-        message: "Description cannot be empty"
-    })
-    description: string;
-
-    @IsNotEmpty({
-        message: "startDate cannot be empty"
-    })
-    @Transform(({ value }) => new Date(value))
-    @IsDate({ message: "startDate must be Date" })
-    startDate: Date;
-
-    @IsNotEmpty({
-        message: "endDate cannot be empty"
-    })
-    @Transform(({ value }) => new Date(value))
-    @IsDate({ message: "endDate must be Date" })
-    endDate: Date;
-
-    @IsNotEmpty({
-        message: "isActive cannot be empty"
-    })
-    @IsBoolean({ message: "isActive must be Boolean" })
-    isActive: boolean;
+  @ApiProperty({
+    example: JobStatus.ACTIVE,
+    description: 'Job status',
+    enum: JobStatus,
+    default: JobStatus.ACTIVE,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(JobStatus)
+  status?: JobStatus;
 }

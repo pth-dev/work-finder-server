@@ -1,69 +1,57 @@
-import { NestFactory, Reflector } from '@nestjs/core';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { AppModule } from './app.module';
-import { join } from 'path';
-import { ConfigService } from '@nestjs/config';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { JwtAuthGuard } from './auth/guard/jwt-auth.guard';
-import { TransformInterceptor } from './core/transform.interceptor';
-import cookieParser from 'cookie-parser';
-import helmet from 'helmet';
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './app.module';
+import * as cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const configService = app.get(ConfigService);
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-    }),
-  );
-
-  const reflector = app.get(Reflector);
-  app.useGlobalInterceptors(new TransformInterceptor(reflector));
-  app.useGlobalGuards(new JwtAuthGuard(reflector));
+  // Security
+  app.use(helmet());
   app.use(cookieParser());
-  app.useStaticAssets(join(__dirname, '..', 'public'));
 
-  //config cors
+  // CORS
   app.enableCors({
-    origin: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    preflightContinue: false,
+    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
     credentials: true,
   });
 
-  //config version
-  app.setGlobalPrefix('api');
-  app.enableVersioning({
-    type: VersioningType.URI,
-    defaultVersion: '1',
-  });
-  app.use(helmet());
+  // Global validation pipe
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
-  //config swagger
+  // Static files serving
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
+  });
+
+  // API prefix
+  app.setGlobalPrefix(process.env.API_PREFIX || 'api/v1');
+
+  // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('Work Finder Server APIs')
-    .setDescription('Work Finder Server API Documentation')
-    .setVersion('1.0.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'Bearer',
-        bearerFormat: 'JWT',
-        in: 'header',
-      },
-      'access-token',
-    )
-    .addSecurityRequirements('access-token')
+    .setTitle('Work Finder API')
+    .setDescription('A comprehensive job finder API built with NestJS')
+    .setVersion('1.0')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('swagger', app, document, {
-    swaggerOptions: { persistAuthorization: true },
-  });
+  SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(configService.get('PORT') || 3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+
+  console.log(`🚀 Application is running on: http://localhost:${port}`);
+  console.log(`📚 Swagger documentation: http://localhost:${port}/api/docs`);
 }
 bootstrap();

@@ -1,64 +1,114 @@
-import { Controller, Post, UseGuards, Get, Body, Res, Req } from '@nestjs/common';
-import { Request, Response } from 'express';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { LocalAuthGuard } from './guard/local-auth.guard';
-import { Public, ResponseMessage } from '../decorator/customize';
-import { LoginUserDto, RegisterDto } from '../users/dto/create-user.dto';
-import { IUser } from 'src/users/users.interface';
-import { User } from '../decorator/customize';
-import { ThrottlerGuard } from '@nestjs/throttler';
-import { ApiBody, ApiTags } from '@nestjs/swagger';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { LocalAuthGuard } from './guards/local-auth.guard';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private authService: AuthService
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
-  @Public()
-  @UseGuards(LocalAuthGuard)
-  @UseGuards(ThrottlerGuard)
-  @ApiBody({ type: LoginUserDto })
-  @Post('login')
-  @ResponseMessage("Login successfully")
-  login(
-    @Req() req,
-    @Res({ passthrough: true }) response: Response) {
-    return this.authService.login(req.user,response);
-  }
-
-  @Public()
   @Post('register')
-  @ResponseMessage("Register succesfully")
-  register(@Body() registerDto: RegisterDto){
-    return this.authService.register(registerDto)
+  @ApiOperation({ summary: 'Register a new user' })
+  @ApiResponse({
+    status: 201,
+    description: 'User registered successfully',
+    schema: {
+      example: {
+        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refresh_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: {
+          user_id: 1,
+          username: 'john_doe',
+          full_name: 'John Doe',
+          email: 'john@example.com',
+          role: 'job_seeker',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 409, description: 'Username or email already exists' })
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
   }
 
-  @Get('account')
-  @ResponseMessage("Get user information")
-  async getProfile(@User() user:IUser) {
-    return {user}
+  @UseGuards(LocalAuthGuard)
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login user' })
+  @ApiResponse({
+    status: 200,
+    description: 'User logged in successfully',
+    schema: {
+      example: {
+        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refresh_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: {
+          user_id: 1,
+          username: 'john_doe',
+          full_name: 'John Doe',
+          email: 'john@example.com',
+          role: 'job_seeker',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(@Body() loginDto: LoginDto, @Request() req) {
+    return this.authService.login(req.user);
   }
 
-  @Public()
-  @Get('refresh')
-  @ResponseMessage("Get user by refreshToken")
-  handleRefreshToken(
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response
-  ){
-    const refreshToken = request.cookies['refresh_token']
-    return this.authService.processNewToken(refreshToken, response)
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiResponse({
+    status: 200,
+    description: 'Token refreshed successfully',
+    schema: {
+      example: {
+        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+  async refresh(@Body('refresh_token') refreshToken: string) {
+    return this.authService.refreshToken(refreshToken);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
-  @ResponseMessage('Logout successfully')
-  logout(
-    @Res({ passthrough: true }) response: Response,
-    @User() user :IUser
-  )
-    {
-    return this.authService.logout(response,user)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout user' })
+  @ApiResponse({ status: 200, description: 'User logged out successfully' })
+  @ApiBearerAuth()
+  async logout(@CurrentUser() user: any) {
+    return this.authService.logout(user.user_id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'Current user profile' })
+  @ApiBearerAuth()
+  async getProfile(@CurrentUser() user: any) {
+    return { user };
   }
 }

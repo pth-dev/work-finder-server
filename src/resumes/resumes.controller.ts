@@ -1,0 +1,103 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
+import { ResumesService } from './resumes.service';
+import { CreateResumeDto } from './dto/create-resume.dto';
+import { UpdateResumeDto } from './dto/update-resume.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Resume } from './entities/resume.entity';
+
+@ApiTags('resumes')
+@Controller('resumes')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class ResumesController {
+  constructor(private readonly resumesService: ResumesService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new resume record' })
+  @ApiResponse({
+    status: 201,
+    description: 'Resume created successfully',
+    type: Resume,
+  })
+  async create(@Body() createResumeDto: CreateResumeDto): Promise<Resume> {
+    return await this.resumesService.create(createResumeDto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all resumes' })
+  @ApiResponse({
+    status: 200,
+    description: 'Resumes retrieved successfully',
+    type: [Resume],
+  })
+  async findAll(): Promise<Resume[]> {
+    return await this.resumesService.findAll();
+  }
+
+  @Get('my-resumes')
+  @ApiOperation({ summary: 'Get current user resumes' })
+  @ApiResponse({
+    status: 200,
+    description: 'User resumes retrieved successfully',
+    type: [Resume],
+  })
+  async getMyResumes(@CurrentUser() user: any): Promise<Resume[]> {
+    return await this.resumesService.findByUser(user.user_id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a specific resume by ID' })
+  @ApiParam({ name: 'id', description: 'Resume ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Resume found',
+    type: Resume,
+  })
+  @ApiResponse({ status: 404, description: 'Resume not found' })
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Resume> {
+    return await this.resumesService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a resume' })
+  @ApiParam({ name: 'id', description: 'Resume ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Resume updated successfully',
+    type: Resume,
+  })
+  @ApiResponse({ status: 404, description: 'Resume not found' })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateResumeDto: UpdateResumeDto,
+  ): Promise<Resume> {
+    return await this.resumesService.update(id, updateResumeDto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a resume' })
+  @ApiParam({ name: 'id', description: 'Resume ID' })
+  @ApiResponse({ status: 200, description: 'Resume deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Resume not found' })
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return await this.resumesService.remove(id);
+  }
+}

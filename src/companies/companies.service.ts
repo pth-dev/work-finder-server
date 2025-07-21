@@ -1,95 +1,122 @@
-import { ConflictException, HttpException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Company } from './entities/company.entity';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { Company, CompanyDocument } from './schemas/company.schema'; 
-import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
-import { InjectModel } from '@nestjs/mongoose';
-import { IUser } from '../users/users.interface';
-import aqp from 'api-query-params';
-import { log } from 'console';
+
 @Injectable()
 export class CompaniesService {
-  constructor(@InjectModel(Company.name) 
-  private companyModel: SoftDeleteModel<CompanyDocument>) {}
-  async create(createCompanyDto: CreateCompanyDto, user:IUser) {
-      const existCompany = await this.companyModel.findOne({ name: createCompanyDto.name });
-      if(existCompany){
-        throw new ConflictException('Company already exits')
-      }
-      const newCompany = await this.companyModel.create({...createCompanyDto,
-        createdBy: {
-          _id: user._id,
-          email: user.email
-        }
-      })
-      return {
-        _id:newCompany._id,
-        createdAt: newCompany.createdAt
-      };
-  }
-  
-  async findAll(currentPage:number, limit:number, qs:string ) {
-    const { filter, sort, projection, population } = aqp(qs);
-    delete filter.current;
-    delete filter.pageSize;
-    
-    let offset = (currentPage - 1) * (limit);
-    let defaultLimit = limit ? limit: 10
-    const totalItems = (await this.companyModel.find(filter)).length
-    const totalPage = Math.ceil(totalItems / defaultLimit)
+  constructor(
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
+  ) {}
 
-    const result = await this.companyModel.find(filter)
-      .skip(offset)
-      .limit(defaultLimit)
-      .sort(sort as any )
-      .populate(population)
-      .exec()
+  async create(createCompanyDto: CreateCompanyDto): Promise<Company> {
+    const company = this.companyRepository.create(createCompanyDto);
+    return await this.companyRepository.save(company);
+  }
+
+  async findAll(
+    filters: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      industry?: string;
+    } = {},
+  ): Promise<{
+    companies: Company[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const { page = 1, limit = 10, search, industry } = filters;
+
+    const queryBuilder = this.companyRepository
+      .createQueryBuilder('company')
+      .leftJoinAndSelect('company.job_posts', 'job_posts');
+
+    // Search in company name and description
+    if (search) {
+      queryBuilder.andWhere(
+        '(company.company_name ILIKE :search OR company.description ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    // Filter by industry
+    if (industry) {
+      queryBuilder.andWhere('company.industry ILIKE :industry', {
+        industry: `%${industry}%`,
+      });
+    }
+
+    // Pagination
+    const offset = (page - 1) * limit;
+    queryBuilder.skip(offset).take(limit);
+
+    // Order by company name
+    queryBuilder.orderBy('company.company_name', 'ASC');
+
+    const [companies, total] = await queryBuilder.getManyAndCount();
 
     return {
-      meta:{ 
-        current: currentPage,
-        pageSize: defaultLimit,
-        total: totalItems,
-        totalPage
+      companies,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async findOne(id: number): Promise<Company> {
+    const company = await this.companyRepository.findOne({
+      where: { company_id: id },
+      relations: ['job_posts'],
+    });
+
+    if (!company) {
+      throw new NotFoundException(`Company with ID ${id} not found`);
+    }
+
+    return company;
+  }
+
+  async update(
+    id: number,
+    updateCompanyDto: UpdateCompanyDto,
+  ): Promise<Company> {
+    const company = await this.findOne(id);
+    Object.assign(company, updateCompanyDto);
+    return await this.companyRepository.save(company);
+  }
+
+  async remove(id: number): Promise<void> {
+    const company = await this.findOne(id);
+    await this.companyRepository.remove(company);
+  }
+
+  async getCompanyJobs(companyId: number) {
+    const company = await this.companyRepository.findOne({
+      where: { company_id: companyId },
+      relations: ['job_posts'],
+    });
+
+    if (!company) {
+      throw new NotFoundException(`Company with ID ${companyId} not found`);
+    }
+
+    return {
+      company: {
+        company_id: company.company_id,
+        company_name: company.company_name,
+        description: company.description,
+        industry: company.industry,
+        website: company.website,
       },
-      result
-    }
-  }
-
-  async findOne(id: string) {
-    const company = await this.companyModel.findById(id)
-    if(!company || company.isDeleted) {
-      throw new NotFoundException('Company Not Found');
-    }
-    return company
-}
-    
-  
-  async update(id: string, updateCompanyDto: UpdateCompanyDto, user : IUser) {
-      const company = await this.companyModel.findById(id)
-      if(!company || company.isDeleted){
-        throw new NotFoundException('Company Not Found')
-      }
-    return await this.companyModel.updateOne({ _id: id }, {...updateCompanyDto, 
-      updatedBy: {
-        _id:user._id,
-        email: user.email
-      }})  
-  }
-
-  async remove(id: string, user: IUser) {
-        const company = await this.companyModel.findById(id)
-        if(!company || company.isDeleted){
-          throw new NotFoundException('Company Not Found')
-        }
-        await this.companyModel.updateOne({_id:id}, 
-          {
-            deletedBy:
-            {
-              _id:user._id,
-              email: user.email
-            }
-        })
-        return await this.companyModel.softDelete({_id:id})
+      jobs: company.job_posts,
+      total_jobs: company.job_posts.length,
+    };
   }
 }

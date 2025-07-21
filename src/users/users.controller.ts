@@ -1,61 +1,75 @@
-  import {
+import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
-  Param,
-  Delete,
-  Put,
-  HttpException,
-  HttpCode,
-  Query,
+  UseInterceptors,
+  ClassSerializerInterceptor,
+  UseGuards,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ResponseMessage, User } from '../decorator/customize';
-import { IUser } from '../users/users.interface';
-import { Public } from '../decorator/customize';
-import { ApiTags } from '@nestjs/swagger';
+import { User } from './entities/user.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @ApiTags('users')
 @Controller('users')
-export class UserController {
+@UseGuards(JwtAuthGuard)
+@UseInterceptors(ClassSerializerInterceptor)
+@ApiBearerAuth()
+export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
-  @ResponseMessage("Created a new user")
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto)
+  @Get('me')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Current user profile',
+    type: User,
+  })
+  async getProfile(@CurrentUser() user: any): Promise<User> {
+    return await this.usersService.findOne(user.user_id);
   }
 
-  @Get()
-  @ResponseMessage("Fetch all user with paginate")
-  findAll(
-    @Query("current") currentPage: string,
-    @Query("pageSize") limit: string,
-    @Query() qs:string
-  ) {
-    return this.usersService.findAll(+currentPage,+limit,qs )
+  @Patch('me')
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated successfully',
+    type: User,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  async updateProfile(
+    @CurrentUser() user: any,
+    @Body() updateUserDto: UpdateUserDto,
+  ): Promise<User> {
+    return await this.usersService.update(user.user_id, updateUserDto);
   }
 
-  @Public()
-  @Get(':id')
-  @ResponseMessage("Fetch user by id")
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id)
-  }
-
-  @Patch(':id')
-  @ResponseMessage("Updated a User")
-  update(@Param('id') id:string, @Body() updateUserDto: UpdateUserDto, @User() user: IUser ){
-    return this.usersService.update(id,updateUserDto,user)
-  }
-
-  @Delete(':id')
-  @ResponseMessage("Delete a User")
-  remove(@Param('id') id: string, @User() user: IUser) {
-  return this.usersService.remove(id, user)
+  @Get('all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get all users (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all users',
+    type: [User],
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin access required',
+  })
+  async findAll(): Promise<User[]> {
+    return await this.usersService.findAll();
   }
 }

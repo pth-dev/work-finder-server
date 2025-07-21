@@ -1,126 +1,148 @@
-import { BadGatewayException, BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { UsersService } from '../users/users.service';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { IUser } from '../users/users.interface';
-import { genSaltSync, hashSync } from 'bcryptjs';
-import { RegisterDto } from '../users/dto/create-user.dto';
-import { ConfigService } from '@nestjs/config';
-import ms from 'ms';
-import { Request, Response } from 'express';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
+import { User } from '../users/entities/user.entity';
+import { RegisterDto } from './dto/register.dto';
+import { UserRole } from '../common/enums/user-role.enum';
+
 @Injectable()
 export class AuthService {
-    constructor(
-        private usesrService:UsersService,
-        private jwtService:JwtService,
-        private configService: ConfigService
-    ){}
+  constructor(
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    private jwtService: JwtService,
+  ) {}
 
-    //check user and password
-    async validateUser(username:string,pass:string):Promise<any>{
-            const user = await this.usesrService.findOnebyUsername(username);
+  async validateUser(username: string, password: string): Promise<any> {
+    const user = await this.userRepository.findOne({
+      where: { username },
+    });
 
-            if(user){
-           const isValid = await this.usesrService.checkUserPassword(pass,user.password)
-            if(isValid){
-                return user.toObject();
-                }
-            }
-            return null
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const { password, refresh_token, ...result } = user;
+      return result;
     }
-    //sign and return access_token
-    async login(user: IUser,response: Response) {
+    return null;
+  }
 
-        const { _id, name, email, role } = user;
-        const payload = {
-            sub: 'Token login',
-            iss: 'From server',
-            _id,
-            name,
-            email,
-            role,
-        };
+  async login(user: any) {
+    const payload = {
+      username: user.username,
+      sub: user.user_id,
+      role: user.role,
+    };
 
-        const refresh_token = this.createRefreshToken(payload)
+    const access_token = this.jwtService.sign(payload);
+    const refresh_token = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-        await this.usesrService.updateUserToken(refresh_token,_id)
-        response.cookie('refresh_token', refresh_token, {
-            httpOnly:true,
-            maxAge:ms(this.configService.get<string>('JWT_REFRESH_EXPIRE'))
-        })
+    // Save refresh token to database
+    await this.userRepository.update(user.user_id, { refresh_token });
 
-        return {
-          access_token: this.jwtService.sign(payload),
-          user:{
-            _id,
-            name,
-            email,
-            role
-          }
-        };
+    return {
+      access_token,
+      refresh_token,
+      user: {
+        user_id: user.user_id,
+        username: user.username,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
+
+  async register(registerDto: RegisterDto) {
+    // Check if username already exists
+    const existingUser = await this.userRepository.findOne({
+      where: { username: registerDto.username },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Username already exists');
+    }
+
+    // Check if email already exists (if provided)
+    if (registerDto.email) {
+      const existingEmail = await this.userRepository.findOne({
+        where: { email: registerDto.email },
+      });
+
+      if (existingEmail) {
+        throw new ConflictException('Email already exists');
       }
-    async register(registerDto:RegisterDto){
-        let result = await this.usesrService.register(registerDto)
-        const {_id, createdAt} = result
-        return{
-            _id,
-            createdAt
-        }
     }
 
-    createRefreshToken = (payload) => {
-        const refresh_token = this.jwtService.sign(payload, {
-            secret: this.configService.get<string>("JWT_REFRESH_KEY"),
-            expiresIn: ms(this.configService.get<string>('JWT_REFRESH_EXPIRE')) / 1000
-        })
-        return refresh_token
-    }
-    
-    processNewToken = async (refeshToken: string,response:Response) => {
-        try{
-       this.jwtService.verify(refeshToken , {
-                secret: this.configService.get<string>("JWT_REFRESH_KEY")
-            })
-            let user = await this.usesrService.findUserByToken(refeshToken)
-            if(!user){
-                throw new BadRequestException('Refreshtoken is invalid')
-            }
-            const { _id, name, email, role } = user;
-            const payload = {
-                sub: 'Token login',
-                iss: 'From server',
-                _id,
-                name,
-                email,
-                role
-            };
-    
-            const refresh_token = this.createRefreshToken(payload)
-        
-            await this.usesrService.updateUserToken(refresh_token,_id.toString())
+    // Hash password
+    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-            response.clearCookie("refresh_token")
-            response.cookie('refresh_token', refresh_token, {
-                httpOnly:true,
-                maxAge:ms(this.configService.get<string>('JWT_REFRESH_EXPIRE'))
-            })
+    // Create user
+    const user = this.userRepository.create({
+      ...registerDto,
+      password: hashedPassword,
+      role: registerDto.role || UserRole.JOB_SEEKER,
+    });
 
-            return {
-              access_token: this.jwtService.sign(payload),
-              user:{
-                _id,
-                name,
-                email,
-                role
-              }
-            };
-        }catch(err){
-            throw new BadRequestException('Refreshtoken is invalid')
-        }
-    }
+    const savedUser = await this.userRepository.save(user);
 
-    async logout(response: Response, user: IUser){
-        await this.usesrService.updateUserToken(null, user._id)
-        response.clearCookie("refresh_token")
-        return "OK"
+    // Generate tokens
+    const payload = {
+      username: savedUser.username,
+      sub: savedUser.user_id,
+      role: savedUser.role,
+    };
+
+    const access_token = this.jwtService.sign(payload);
+    const refresh_token = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    // Save refresh token
+    await this.userRepository.update(savedUser.user_id, { refresh_token });
+
+    return {
+      access_token,
+      refresh_token,
+      user: {
+        user_id: savedUser.user_id,
+        username: savedUser.username,
+        full_name: savedUser.full_name,
+        email: savedUser.email,
+        role: savedUser.role,
+      },
+    };
+  }
+
+  async refreshToken(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken);
+      const user = await this.userRepository.findOne({
+        where: { user_id: payload.sub, refresh_token: refreshToken },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      const newPayload = {
+        username: user.username,
+        sub: user.user_id,
+        role: user.role,
+      };
+
+      const access_token = this.jwtService.sign(newPayload);
+
+      return { access_token };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async logout(userId: number) {
+    await this.userRepository.update(userId, { refresh_token: undefined });
+    return { message: 'Logged out successfully' };
+  }
 }
