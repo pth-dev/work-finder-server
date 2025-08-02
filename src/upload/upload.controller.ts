@@ -40,9 +40,16 @@ export class UploadController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: (req, file, cb) => {
+        destination: async (req, file, cb) => {
           const uploadPath = path.join(process.cwd(), 'uploads', 'avatars');
-          cb(null, uploadPath);
+          // ✅ Ensure directory exists asynchronously
+          try {
+            const fs = require('fs/promises');
+            await fs.mkdir(uploadPath, { recursive: true });
+            cb(null, uploadPath);
+          } catch (error) {
+            cb(error, uploadPath);
+          }
         },
         filename: (req, file, cb) => {
           const timestamp = Date.now();
@@ -122,9 +129,16 @@ export class UploadController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: (req, file, cb) => {
+        destination: async (req, file, cb) => {
           const uploadPath = path.join(process.cwd(), 'uploads', 'resumes');
-          cb(null, uploadPath);
+          // ✅ Ensure directory exists asynchronously
+          try {
+            const fs = require('fs/promises');
+            await fs.mkdir(uploadPath, { recursive: true });
+            cb(null, uploadPath);
+          } catch (error) {
+            cb(error, uploadPath);
+          }
         },
         filename: (req, file, cb) => {
           const timestamp = Date.now();

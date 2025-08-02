@@ -120,6 +120,8 @@ export class ApplicationsService {
       throw new NotFoundException('Failed to retrieve created application');
     }
 
+    // Note: Email notifications removed for simplicity in graduation project
+
     return finalApplication;
   }
 
@@ -128,8 +130,8 @@ export class ApplicationsService {
       page?: number;
       limit?: number;
       status?: ApplicationStatus;
-      job_id?: number;
-      user_id?: number;
+      jobId?: number;
+      userId?: number;
     } = {},
   ): Promise<{
     applications: Application[];
@@ -138,14 +140,30 @@ export class ApplicationsService {
     limit: number;
     totalPages: number;
   }> {
-    const { page = 1, limit = 10, status, job_id, user_id } = filters;
+    const { page = 1, limit = 10, status, jobId, userId } = filters;
 
     const queryBuilder = this.applicationRepository
       .createQueryBuilder('application')
-      .leftJoinAndSelect('application.job_post', 'job_post')
-      .leftJoinAndSelect('application.resume', 'resume')
-      .leftJoinAndSelect('resume.user', 'user')
-      .leftJoinAndSelect('job_post.company', 'company');
+      .leftJoin('application.job_post', 'job_post')
+      .addSelect([
+        'job_post.job_id',
+        'job_post.job_title',
+        'job_post.location',
+        'job_post.salary_min',
+        'job_post.salary_max',
+        'job_post.job_type',
+        'job_post.status',
+      ])
+      .leftJoin('application.resume', 'resume')
+      .addSelect(['resume.resume_id', 'resume.file_name'])
+      .leftJoin('resume.user', 'user')
+      .addSelect(['user.user_id', 'user.full_name', 'user.email'])
+      .leftJoin('job_post.company', 'company')
+      .addSelect([
+        'company.company_id',
+        'company.company_name',
+        'company.company_image',
+      ]);
 
     // Filter by status
     if (status) {
@@ -153,13 +171,13 @@ export class ApplicationsService {
     }
 
     // Filter by job
-    if (job_id) {
-      queryBuilder.andWhere('application.job_id = :job_id', { job_id });
+    if (jobId) {
+      queryBuilder.andWhere('application.job_id = :jobId', { jobId });
     }
 
     // Filter by user (through resume)
-    if (user_id) {
-      queryBuilder.andWhere('resume.user_id = :user_id', { user_id });
+    if (userId) {
+      queryBuilder.andWhere('resume.user_id = :userId', { userId });
     }
 
     // Pagination
@@ -316,10 +334,24 @@ export class ApplicationsService {
   async getApplicationsByUser(userId: number): Promise<Application[]> {
     return await this.applicationRepository
       .createQueryBuilder('application')
-      .leftJoinAndSelect('application.job_post', 'job_post')
-      .leftJoinAndSelect('application.resume', 'resume')
-      .leftJoinAndSelect('job_post.company', 'company')
-      .where('resume.user_id = :userId', { userId })
+      .leftJoin('application.job_post', 'job_post')
+      .addSelect([
+        'job_post.job_id',
+        'job_post.job_title',
+        'job_post.location',
+        'job_post.salary_min',
+        'job_post.salary_max',
+        'job_post.status',
+      ])
+      .leftJoin('application.resume', 'resume')
+      .addSelect(['resume.resume_id', 'resume.file_name'])
+      .leftJoin('job_post.company', 'company')
+      .addSelect([
+        'company.company_id',
+        'company.company_name',
+        'company.company_image',
+      ])
+      .where('application.user_id = :userId', { userId })
       .orderBy('application.applied_at', 'DESC')
       .getMany();
   }

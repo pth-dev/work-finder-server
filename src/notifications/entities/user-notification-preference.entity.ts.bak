@@ -1,0 +1,85 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Unique,
+} from 'typeorm';
+import { User } from '../../users/entities/user.entity';
+import { NotificationType } from './notification-type.entity';
+
+export enum NotificationFrequency {
+  IMMEDIATE = 'immediate',
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  MONTHLY = 'monthly',
+  NEVER = 'never',
+}
+
+@Entity('user_notification_preferences')
+@Unique(['user_id', 'notification_type_id'])
+export class UserNotificationPreference {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  user_id: number;
+
+  @Column()
+  notification_type_id: number;
+
+  @Column({ default: true })
+  email_enabled: boolean;
+
+  @Column({ default: true })
+  push_enabled: boolean;
+
+  @Column({ default: true })
+  in_app_enabled: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: NotificationFrequency,
+    default: NotificationFrequency.IMMEDIATE,
+  })
+  frequency: NotificationFrequency;
+
+  @Column({ type: 'time', nullable: true })
+  quiet_hours_start?: string;
+
+  @Column({ type: 'time', nullable: true })
+  quiet_hours_end?: string;
+
+  @Column({ length: 50, default: 'UTC' })
+  timezone: string;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+
+  @DeleteDateColumn()
+  deleted_at?: Date;
+
+  // Relations
+  @ManyToOne(() => User, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
+
+  @ManyToOne(
+    () => NotificationType,
+    (notificationType) => notificationType.user_preferences,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
+  @JoinColumn({ name: 'notification_type_id' })
+  notification_type: NotificationType;
+}

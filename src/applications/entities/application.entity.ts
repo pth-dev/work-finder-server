@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { JobPost } from '../../jobs/entities/job.entity';
 import { Resume } from '../../resumes/entities/resume.entity';
@@ -15,6 +16,12 @@ import { ApplicationStatus } from '../../common/enums/application-status.enum';
 import { Interview } from './interview.entity';
 
 @Entity('applications')
+@Index('IDX_application_job_user', ['job_id', 'user_id'], { unique: true }) // Prevent duplicate applications
+@Index('IDX_application_status', ['status']) // Status filtering
+@Index('IDX_application_job_status', ['job_id', 'status']) // Job applications by status
+@Index('IDX_application_user_status', ['user_id', 'status']) // User applications by status
+@Index('IDX_application_applied_at', ['applied_at']) // Application date sorting
+@Index('IDX_application_resume', ['resume_id']) // Resume-based queries
 export class Application {
   @PrimaryGeneratedColumn()
   application_id: number;

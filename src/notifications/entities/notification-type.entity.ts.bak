@@ -1,0 +1,90 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { Notification } from './notification.entity';
+import { UserNotificationPreference } from './user-notification-preference.entity';
+
+export enum NotificationCategory {
+  JOB_MATCH = 'job_match',
+  APPLICATION_UPDATE = 'application_update',
+  INTERVIEW = 'interview',
+  MESSAGE = 'message',
+  SYSTEM = 'system',
+  MARKETING = 'marketing',
+  SECURITY = 'security',
+}
+
+export enum NotificationPriority {
+  LOW = 'low',
+  NORMAL = 'normal',
+  HIGH = 'high',
+  URGENT = 'urgent',
+}
+
+@Entity('notification_types')
+export class NotificationType {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ length: 100, unique: true })
+  name: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({
+    type: 'enum',
+    enum: NotificationCategory,
+  })
+  category: NotificationCategory;
+
+  @Column({ default: true })
+  default_enabled: boolean;
+
+  @Column({ default: true })
+  can_be_disabled: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: NotificationPriority,
+    default: NotificationPriority.NORMAL,
+  })
+  priority: NotificationPriority;
+
+  @Column({ length: 255, nullable: true })
+  template_subject?: string;
+
+  @Column({ type: 'text', nullable: true })
+  template_body?: string;
+
+  @Column({ default: true })
+  is_active: boolean;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+
+  @DeleteDateColumn()
+  deleted_at?: Date;
+
+  // Relations
+  @OneToMany(
+    () => Notification,
+    (notification) => notification.notification_type,
+  )
+  notifications: Notification[];
+
+  @OneToMany(
+    () => UserNotificationPreference,
+    (preference) => preference.notification_type,
+  )
+  user_preferences: UserNotificationPreference[];
+}

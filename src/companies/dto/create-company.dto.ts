@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsUrl, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsUrl, MaxLength, IsEnum } from 'class-validator';
 
 export class CreateCompanyDto {
   @ApiProperty({ 
@@ -50,4 +50,34 @@ export class CreateCompanyDto {
   @IsUrl()
   @MaxLength(255)
   website?: string;
+
+  @ApiProperty({
+    example: '123 Tech Street, Silicon Valley',
+    description: 'Company address',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiProperty({
+    example: 'San Francisco, CA',
+    description: 'Company location',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  location?: string;
+
+  @ApiProperty({
+    example: '51-200',
+    description: 'Company size range',
+    enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'],
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'])
+  @MaxLength(20)
+  company_size?: string;
 }

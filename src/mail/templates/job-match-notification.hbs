@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkFinder - Việc làm phù hợp</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 300;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .job-card {
+            background: linear-gradient(135deg, #e8f5e8 0%, #f1f8f1 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            border-left: 5px solid #4caf50;
+        }
+        .job-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2e7d32;
+            margin: 0 0 10px 0;
+        }
+        .company-name {
+            font-size: 18px;
+            color: #666;
+            margin: 0 0 15px 0;
+        }
+        .job-details {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .detail-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            color: #444;
+        }
+        .detail-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            color: #4caf50;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 500;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .btn:hover {
+            background: linear-gradient(135deg, #45a049 0%, #4caf50 100%);
+        }
+        .tips {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        .unsubscribe {
+            color: #999;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .unsubscribe a {
+            color: #4caf50;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WorkFinder</h1>
+            <p>🎉 Có việc làm mới phù hợp với bạn!</p>
+        </div>
+        
+        <div class="content">
+            <h2>Xin chào {{name}}!</h2>
+            <p>Chúng tôi tìm thấy một cơ hội việc làm tuyệt vời phù hợp với hồ sơ và mong muốn của bạn:</p>
+            
+            <div class="job-card">
+                <div class="job-title">{{jobTitle}}</div>
+                <div class="company-name">📍 {{companyName}}</div>
+                
+                <div style="text-align: center; margin: 25px 0;">
+                    <a href="{{jobUrl}}" class="btn">Xem Chi Tiết & Ứng Tuyển</a>
+                </div>
+            </div>
+            
+            <div class="tips">
+                <h3 style="margin-top: 0; color: #e65100;">💡 Gợi ý ứng tuyển:</h3>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li>Đọc kỹ mô tả công việc và yêu cầu</li>
+                    <li>Tùy chỉnh CV để phù hợp với vị trí</li>
+                    <li>Viết thư xin việc cá nhân hóa</li>
+                    <li>Ứng tuyển sớm để tăng cơ hội được chú ý</li>
+                </ul>
+            </div>
+            
+            <p>Đừng bỏ lỡ cơ hội này! Hãy nhanh chóng ứng tuyển để không bị các ứng viên khác vượt mặt.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{jobUrl}}" class="btn">Ứng Tuyển Ngay</a>
+            </div>
+            
+            <p>Chúc bạn thành công trong quá trình tìm kiếm việc làm!</p>
+            
+            <p>Trân trọng,<br>
+            <strong>Đội ngũ WorkFinder</strong></p>
+        </div>
+        
+        <div class="footer">
+            <p>© 2024 WorkFinder. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+            <div class="unsubscribe">
+                <p>Bạn nhận được email này vì đã đăng ký nhận thông báo việc làm.<br>
+                <a href="#">Hủy đăng ký</a> | <a href="#">Cập nhật tùy chọn email</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

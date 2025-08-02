@@ -12,6 +12,7 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
+
 import {
   ApiTags,
   ApiOperation,
@@ -65,13 +66,13 @@ export class JobsController {
     description: 'Filter by location',
   })
   @ApiQuery({
-    name: 'job_type',
+    name: 'jobType',
     required: false,
     enum: JobType,
     description: 'Filter by job type',
   })
   @ApiQuery({
-    name: 'company_id',
+    name: 'companyId',
     required: false,
     type: Number,
     description: 'Filter by company',
@@ -86,31 +87,71 @@ export class JobsController {
     name: 'limit',
     required: false,
     type: Number,
-    description: 'Items per page (default: 10)',
+    description: 'Items per page (default: 20)',
   })
   @ApiQuery({
-    name: 'sort_by',
+    name: 'sortBy',
     required: false,
     enum: ['posted_date', 'salary', 'save_count'],
     description: 'Sort by field',
   })
   @ApiQuery({
-    name: 'sort_order',
+    name: 'sortOrder',
     required: false,
     enum: ['ASC', 'DESC'],
     description: 'Sort order',
   })
-  async findAll(@Query() filters: JobSearchFilters) {
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: 'Filter by job category',
+  })
+  @ApiQuery({
+    name: 'salary_min',
+    required: false,
+    type: Number,
+    description: 'Minimum salary filter',
+  })
+  @ApiQuery({
+    name: 'salary_max',
+    required: false,
+    type: Number,
+    description: 'Maximum salary filter',
+  })
+  @ApiQuery({
+    name: 'job_type',
+    required: false,
+    enum: JobType,
+    description: 'Filter by job type (alternative to jobType)',
+  })
+  async findAll(@Query() query: any) {
+    console.log('🔍 Backend received query params:', query);
+
+    const filters: JobSearchFilters = {
+      search: query.search,
+      location: query.location,
+      jobType: query.jobType || query.job_type, // Support both formats
+      companyId: query.companyId ? parseInt(query.companyId) : undefined,
+      category: query.category,
+      salaryMin: query.salary_min ? parseInt(query.salary_min) : undefined,
+      salaryMax: query.salary_max ? parseInt(query.salary_max) : undefined,
+      page: query.page ? parseInt(query.page) : 1,
+      limit: query.limit ? parseInt(query.limit) : 20,
+      sortBy: query.sortBy || 'posted_date',
+      sortOrder: query.sortOrder || 'DESC',
+    };
+
+    console.log('🔄 Backend processed filters:', filters);
     return await this.jobsService.findAll(filters);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a specific job by ID' })
-  @ApiParam({ name: 'id', description: 'Job ID' })
+  @Get(':identifier')
+  @ApiOperation({ summary: 'Get a specific job by ID or slug' })
+  @ApiParam({ name: 'identifier', description: 'Job ID (numeric) or slug (string)' })
   @ApiResponse({ status: 200, description: 'Job found', type: JobPost })
   @ApiResponse({ status: 404, description: 'Job not found' })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<JobPost> {
-    return await this.jobsService.findOne(id);
+  async findOne(@Param('identifier') identifier: string): Promise<JobPost> {
+    return await this.jobsService.findBySlugOrId(identifier);
   }
 
   @Patch(':id')
@@ -146,16 +187,14 @@ export class JobsController {
     return await this.jobsService.remove(id);
   }
 
-  @Get('company/:companyId')
-  @ApiOperation({ summary: 'Get all jobs by company' })
-  @ApiParam({ name: 'companyId', description: 'Company ID' })
+  @Get('featured/:limit')
+  @ApiOperation({ summary: 'Get featured jobs (highest save count)' })
+  @ApiParam({ name: 'limit', description: 'Number of featured jobs to return' })
   @ApiResponse({
     status: 200,
-    description: 'Company jobs retrieved successfully',
+    description: 'Featured jobs retrieved successfully',
   })
-  async getJobsByCompany(
-    @Param('companyId', ParseIntPipe) companyId: number,
-  ): Promise<JobPost[]> {
-    return await this.jobsService.getJobsByCompany(companyId);
+  async getFeaturedJobs(@Param('limit', ParseIntPipe) limit: number) {
+    return await this.jobsService.getFeaturedJobs(limit);
   }
 }

@@ -72,7 +72,7 @@ export class ApplicationsController {
     description: 'Filter by application status',
   })
   @ApiQuery({
-    name: 'job_id',
+    name: 'jobId',
     required: false,
     type: Number,
     description: 'Filter by job ID',
@@ -92,16 +92,45 @@ export class ApplicationsController {
   async findAll(
     @CurrentUser() user: any,
     @Query('status') status?: ApplicationStatus,
-    @Query('job_id') jobId?: number,
+    @Query('jobId') jobId?: number,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
   ) {
     return await this.applicationsService.findAll({
       status,
-      job_id: jobId,
+      jobId: jobId,
       page,
       limit,
-      user_id: user.role === UserRole.JOB_SEEKER ? user.user_id : undefined,
+      userId: user.role === UserRole.JOB_SEEKER ? user.user_id : undefined,
+    });
+  }
+
+  @Get('jobs/:jobId/applications')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.RECRUITER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Get applications for a specific job (Recruiter only)',
+  })
+  @ApiParam({ name: 'jobId', description: 'Job ID' })
+  @ApiQuery({ name: 'status', required: false, enum: ApplicationStatus })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Applications retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Job not found or unauthorized' })
+  async getJobApplications(
+    @Param('jobId', ParseIntPipe) jobId: number,
+    @CurrentUser() user: any,
+    @Query('status') status?: ApplicationStatus,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return await this.applicationsService.findByJob(jobId, user.user_id, {
+      status,
+      page,
+      limit,
     });
   }
 
@@ -167,35 +196,6 @@ export class ApplicationsController {
       user.user_id,
       user.role,
     );
-  }
-
-  @Get('jobs/:jobId/applications')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.RECRUITER, UserRole.ADMIN)
-  @ApiOperation({
-    summary: 'Get applications for a specific job (Recruiter only)',
-  })
-  @ApiParam({ name: 'jobId', description: 'Job ID' })
-  @ApiQuery({ name: 'status', required: false, enum: ApplicationStatus })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({
-    status: 200,
-    description: 'Applications retrieved successfully',
-  })
-  @ApiResponse({ status: 404, description: 'Job not found or unauthorized' })
-  async getJobApplications(
-    @Param('jobId', ParseIntPipe) jobId: number,
-    @CurrentUser() user: any,
-    @Query('status') status?: ApplicationStatus,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
-  ) {
-    return await this.applicationsService.findByJob(jobId, user.user_id, {
-      status,
-      page,
-      limit,
-    });
   }
 
   @Get('stats')

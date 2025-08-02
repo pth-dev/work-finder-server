@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkFinder - Chào mừng bạn!</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 300;
+        }
+        .welcome-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .feature-list {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: white;
+            border-radius: 6px;
+        }
+        .feature-icon {
+            font-size: 24px;
+            margin-right: 15px;
+            width: 40px;
+            text-align: center;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 500;
+            margin: 20px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="welcome-icon">🎉</div>
+            <h1>Chào mừng đến với WorkFinder!</h1>
+            <p>Tài khoản của bạn đã được kích hoạt thành công</p>
+        </div>
+        
+        <div class="content">
+            <h2>Xin chào {{name}}!</h2>
+            <p>Chúc mừng bạn đã trở thành thành viên của WorkFinder! Chúng tôi rất vui mừng được đồng hành cùng bạn trong hành trình tìm kiếm cơ hội nghề nghiệp mới.</p>
+            
+            <div class="feature-list">
+                <h3 style="margin-top: 0; color: #333;">🌟 Những gì bạn có thể làm tại WorkFinder:</h3>
+                
+                <div class="feature-item">
+                    <div class="feature-icon">🔍</div>
+                    <div>
+                        <strong>Tìm kiếm việc làm thông minh</strong><br>
+                        <small>Tìm kiếm hàng ngàn cơ hội việc làm phù hợp với kỹ năng của bạn</small>
+                    </div>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-icon">📄</div>
+                    <div>
+                        <strong>Quản lý hồ sơ cá nhân</strong><br>
+                        <small>Tạo và cập nhật CV, thông tin cá nhân một cách dễ dàng</small>
+                    </div>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-icon">💼</div>
+                    <div>
+                        <strong>Ứng tuyển nhanh chóng</strong><br>
+                        <small>Nộp đơn ứng tuyển chỉ với vài cú click chuột</small>
+                    </div>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-icon">🔔</div>
+                    <div>
+                        <strong>Thông báo việc làm phù hợp</strong><br>
+                        <small>Nhận thông báo email về các cơ hội việc làm mới</small>
+                    </div>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-icon">❤️</div>
+                    <div>
+                        <strong>Lưu việc làm yêu thích</strong><br>
+                        <small>Bookmark những công việc quan tâm để xem lại sau</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="#" class="btn">Khám Phá WorkFinder Ngay</a>
+            </div>
+            
+            <p><strong>Lời khuyên từ WorkFinder:</strong></p>
+            <ul>
+                <li>Hoàn thiện hồ sơ cá nhân để tăng cơ hội được nhà tuyển dụng chú ý</li>
+                <li>Cập nhật thông tin định kỳ để nhận được những gợi ý việc làm tốt nhất</li>
+                <li>Tham gia cộng đồng WorkFinder để kết nối và học hỏi kinh nghiệm</li>
+            </ul>
+            
+            <p>Nếu bạn có bất kỳ câu hỏi nào, đừng ngần ngại liên hệ với đội ngũ hỗ trợ của chúng tôi.</p>
+            
+            <p>Chúc bạn thành công trong việc tìm kiếm cơ hội nghề nghiệp lý tưởng!</p>
+            
+            <p>Trân trọng,<br>
+            <strong>Đội ngũ WorkFinder</strong></p>
+        </div>
+        
+        <div class="footer">
+            <p>© 2024 WorkFinder. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+        </div>
+    </div>
+</body>
+</html>

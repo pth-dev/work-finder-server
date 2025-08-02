@@ -18,16 +18,13 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    // Check if username already exists
     const existingUser = await this.userRepository.findOne({
-      where: { username: createUserDto.username },
+      where: { email: createUserDto.email },
     });
 
     if (existingUser) {
-      throw new ConflictException('Username already exists');
+      throw new ConflictException('Email already exists');
     }
-
-    // Check if email already exists (if provided)
     if (createUserDto.email) {
       const existingEmail = await this.userRepository.findOne({
         where: { email: createUserDto.email },
@@ -38,10 +35,8 @@ export class UsersService {
       }
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
-    // Create user
     const user = this.userRepository.create({
       ...createUserDto,
       password: hashedPassword,
@@ -66,12 +61,6 @@ export class UsersService {
     return user;
   }
 
-  async findByUsername(username: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: { username },
-    });
-  }
-
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { email },
@@ -81,23 +70,20 @@ export class UsersService {
   async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
-    // Hash password if provided
     if (updateUserDto.password) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
-    // Check for username conflicts
-    if (updateUserDto.username && updateUserDto.username !== user.username) {
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
       const existingUser = await this.userRepository.findOne({
-        where: { username: updateUserDto.username },
+        where: { email: updateUserDto.email },
       });
 
       if (existingUser) {
-        throw new ConflictException('Username already exists');
+        throw new ConflictException('Email already exists');
       }
     }
 
-    // Check for email conflicts
     if (updateUserDto.email && updateUserDto.email !== user.email) {
       const existingEmail = await this.userRepository.findOne({
         where: { email: updateUserDto.email },

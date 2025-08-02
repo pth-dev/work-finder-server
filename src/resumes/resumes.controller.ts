@@ -8,6 +8,8 @@ import {
   Delete,
   UseGuards,
   ParseIntPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -93,9 +95,10 @@ export class ResumesController {
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a resume' })
   @ApiParam({ name: 'id', description: 'Resume ID' })
-  @ApiResponse({ status: 200, description: 'Resume deleted successfully' })
+  @ApiResponse({ status: 204, description: 'Resume deleted successfully' })
   @ApiResponse({ status: 404, description: 'Resume not found' })
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return await this.resumesService.remove(id);
