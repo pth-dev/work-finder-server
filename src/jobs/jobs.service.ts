@@ -6,7 +6,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JobPost } from './entities/job.entity';
+import { SavedJob } from './entities/saved-job.entity';
 import { Company } from '../companies/entities/company.entity';
+import { Application } from '../applications/entities/application.entity';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { JobStatus } from '../common/enums/job-status.enum';
@@ -18,7 +20,6 @@ export interface JobSearchFilters {
   location?: string;
   jobType?: JobType;
   companyId?: number;
-  category?: string;
   salaryMin?: number;
   salaryMax?: number;
   page?: number;
@@ -32,9 +33,13 @@ export class JobsService {
   constructor(
     @InjectRepository(JobPost)
     private readonly jobRepository: Repository<JobPost>,
+    @InjectRepository(SavedJob)
+    private readonly savedJobRepository: Repository<SavedJob>,
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
-    private cacheService: CacheService, // ✅ Added cache service
+    @InjectRepository(Application)
+    private readonly applicationRepository: Repository<Application>,
+    private cacheService: CacheService,
   ) {}
 
   async create(createJobDto: CreateJobDto): Promise<JobPost> {
@@ -88,7 +93,6 @@ export class JobsService {
       location,
       jobType,
       companyId,
-      category,
       salaryMin,
       salaryMax,
       page = 1,
@@ -97,8 +101,6 @@ export class JobsService {
       sortOrder = 'DESC',
     } = filters;
 
-    console.log('🔍 JobsService.findAll filters:', filters);
-
     const queryBuilder = this.jobRepository
       .createQueryBuilder('job')
       .select([
@@ -106,7 +108,6 @@ export class JobsService {
         'job.company_id',
         'job.job_title',
         'job.location',
-        'job.category',
         'job.salary_min',
         'job.salary_max',
         'job.salary',
@@ -116,7 +117,6 @@ export class JobsService {
         'job.view_count',
         'job.save_count',
         'job.application_count',
-        // ✅ OPTIMIZED: Get full description, truncate in application layer
         'job.description',
       ])
       .leftJoin('job.company', 'company')
@@ -131,8 +131,6 @@ export class JobsService {
       .andWhere('(job.expires_at IS NULL OR job.expires_at > :now)', {
         now: new Date(),
       });
-
-    // ✅ OPTIMIZED: Use search_vector index for better performance
     if (search) {
       queryBuilder.andWhere('job.search_vector @@ plainto_tsquery(:search)', {
         search,
@@ -154,13 +152,6 @@ export class JobsService {
     // Filter by company
     if (companyId) {
       queryBuilder.andWhere('job.company_id = :companyId', { companyId });
-    }
-
-    // Filter by category
-    if (category) {
-      queryBuilder.andWhere('job.category ILIKE :category', {
-        category: `%${category}%`,
-      });
     }
 
     // Filter by salary range
@@ -215,6 +206,62 @@ export class JobsService {
     return result;
   }
 
+  /**
+   * Find all jobs with user-specific data (saved status and applied status)
+   */
+  async findAllWithUserData(
+    filters: JobSearchFilters = {},
+    userId?: number,
+  ): Promise<{
+    jobs: (JobPost & { is_saved?: boolean; is_applied?: boolean })[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    // Get base jobs data
+    const baseResult = await this.findAll(filters);
+
+    if (!userId) {
+      return baseResult;
+    }
+
+    // Get user's saved jobs
+    const savedJobIds = await this.savedJobRepository
+      .createQueryBuilder('saved')
+      .select('saved.job_id')
+      .where('saved.user_id = :userId', { userId })
+      .getRawMany()
+      .then((results) => results.map((r) => r.saved_job_id));
+
+    // ✅ NEW: Get user's applied jobs
+    const appliedJobIds = await this.applicationRepository
+      .createQueryBuilder('application')
+      .select('application.job_id')
+      .where('application.user_id = :userId', { userId })
+      .getRawMany()
+      .then((results) => results.map((r) => r.application_job_id));
+
+    // Add is_saved and is_applied status to jobs
+    const jobsWithUserData = baseResult.jobs.map((job) => {
+      const isSaved = savedJobIds.includes(job.job_id);
+      const isApplied = appliedJobIds.includes(job.job_id);
+      console.log(
+        `📋 Job ${job.job_id} (${job.job_title}): is_saved = ${isSaved}, is_applied = ${isApplied}`,
+      );
+      return {
+        ...job,
+        is_saved: isSaved,
+        is_applied: isApplied,
+      };
+    });
+
+    return {
+      ...baseResult,
+      jobs: jobsWithUserData,
+    };
+  }
+
   async findOne(id: number): Promise<JobPost> {
     const job = await this.jobRepository
       .createQueryBuilder('job')
@@ -258,22 +305,58 @@ export class JobsService {
     throw new NotFoundException(`Job not found: ${identifier}`);
   }
 
+  /**
+   * Find job by slug or ID with user-specific data (is_saved and is_applied status)
+   */
+  async findBySlugOrIdWithUserData(
+    identifier: string,
+    userId?: number,
+  ): Promise<
+    JobPost & { is_saved?: boolean; is_applied?: boolean; applied_at?: string }
+  > {
+    const job = await this.findBySlugOrId(identifier);
+
+    // ✅ ADD: Increment view count when job is viewed
+    // await this.incrementViewCount(job.job_id);
+
+    if (!userId) {
+      return job;
+    }
+
+    // Check if user has saved this job
+    const isSaved = await this.savedJobRepository.findOne({
+      where: { user_id: userId, job_id: job.job_id },
+    });
+
+    // ✅ NEW: Check if user has applied to this job
+    const application = await this.applicationRepository.findOne({
+      where: { user_id: userId, job_id: job.job_id },
+    });
+
+    return {
+      ...job,
+      is_saved: !!isSaved,
+      is_applied: !!application,
+      applied_at: application?.applied_at?.toISOString(),
+    };
+  }
+
   generateJobSlug(job: JobPost): string {
     const title = job.job_title
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .substring(0, 40);
-    
-    const company = job.company?.company_name
-      ?.toLowerCase()
-      ?.replace(/[^a-z0-9\s-]/g, '')
-      ?.replace(/\s+/g, '-')
-      ?.substring(0, 20) || 'company';
-    
+
+    const company =
+      job.company?.company_name
+        ?.toLowerCase()
+        ?.replace(/[^a-z0-9\s-]/g, '')
+        ?.replace(/\s+/g, '-')
+        ?.substring(0, 20) || 'company';
+
     return `${title}-${company}-${job.job_id}`;
   }
-
 
   async update(id: number, updateJobDto: UpdateJobDto): Promise<JobPost> {
     const job = await this.findOne(id);
@@ -315,6 +398,11 @@ export class JobsService {
   async decrementSaveCount(jobId: number): Promise<void> {
     await this.jobRepository.decrement({ job_id: jobId }, 'save_count', 1);
   }
+
+  // ✅ ADD: View count tracking methods
+  // async incrementViewCount(jobId: number): Promise<void> {
+  //   await this.jobRepository.increment({ job_id: jobId }, 'view_count', 1);
+  // }
 
   // Optimized method for featured jobs with caching
   async getFeaturedJobs(limit: number = 6): Promise<{
@@ -376,5 +464,127 @@ export class JobsService {
       })),
       total,
     };
+  }
+
+  // ===== JOB SAVE/UNSAVE FUNCTIONALITY =====
+
+  async getSavedJobs(
+    userId: number,
+    options: { page?: number; limit?: number } = {},
+  ): Promise<{
+    jobs: JobPost[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  }> {
+    const { page = 1, limit = 10 } = options;
+    const skip = (page - 1) * limit;
+
+    // ✅ OPTIMIZED: Use query builder for better performance
+    const queryBuilder = this.savedJobRepository
+      .createQueryBuilder('saved_job')
+      .leftJoinAndSelect('saved_job.job_post', 'job')
+      .leftJoinAndSelect('job.company', 'company')
+      .where('saved_job.user_id = :userId', { userId })
+      .andWhere('job.status = :status', { status: JobStatus.ACTIVE })
+      .orderBy('saved_job.saved_at', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [savedJobs, total] = await queryBuilder.getManyAndCount();
+    const jobs = savedJobs.map((savedJob) => savedJob.job_post);
+
+    return {
+      jobs,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async saveJob(
+    userId: number,
+    jobId: number,
+  ): Promise<{ message: string; is_saved: boolean }> {
+    // 1. Verify job exists and is active
+    const job = await this.jobRepository.findOne({
+      where: { job_id: jobId, status: JobStatus.ACTIVE },
+    });
+
+    if (!job) {
+      throw new NotFoundException('Job not found or not available');
+    }
+
+    // 2. Check if already saved
+    const existingSave = await this.savedJobRepository.findOne({
+      where: { user_id: userId, job_id: jobId },
+    });
+
+    if (existingSave) {
+      return {
+        message: 'Job already saved',
+        is_saved: true,
+      };
+    }
+
+    // 3. Create saved job record
+    const savedJob = this.savedJobRepository.create({
+      user_id: userId,
+      job_id: jobId,
+    });
+
+    await this.savedJobRepository.save(savedJob);
+
+    // 4. Increment save count
+    await this.incrementSaveCount(jobId);
+
+    // 5. Invalidate cache
+    await this.cacheService.invalidateJobCache(jobId);
+
+    return {
+      message: 'Job saved successfully',
+      is_saved: true,
+    };
+  }
+
+  async unsaveJob(
+    userId: number,
+    jobId: number,
+  ): Promise<{ message: string; is_saved: boolean }> {
+    // 1. Find saved job record
+    const savedJob = await this.savedJobRepository.findOne({
+      where: { user_id: userId, job_id: jobId },
+    });
+
+    if (!savedJob) {
+      throw new NotFoundException('Job not found in saved jobs');
+    }
+
+    // 2. Remove saved job record
+    await this.savedJobRepository.remove(savedJob);
+
+    // 3. Decrement save count
+    await this.decrementSaveCount(jobId);
+
+    // 4. Invalidate cache
+    await this.cacheService.invalidateJobCache(jobId);
+
+    return {
+      message: 'Job unsaved successfully',
+      is_saved: false,
+    };
+  }
+
+  async isJobSaved(userId: number, jobId: number): Promise<boolean> {
+    const savedJob = await this.savedJobRepository.findOne({
+      where: { user_id: userId, job_id: jobId },
+    });
+    return !!savedJob;
   }
 }

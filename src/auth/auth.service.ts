@@ -60,18 +60,6 @@ export class AuthService {
       throw new UnauthorizedException('auth.messages.otp.userNotFound');
     }
 
-    // Debug logging
-    console.log('OTP Verification Debug:', {
-      inputOTP: otp_code,
-      storedOTP: user.otp_code,
-      otpType: user.otp_type,
-      expiresAt: user.otp_expires_at,
-      currentTime: new Date(),
-      isExpired: user.otp_expires_at
-        ? new Date() > user.otp_expires_at
-        : 'No expiry set',
-    });
-
     if (!user.otp_code) {
       throw new UnauthorizedException('auth.messages.otp.noOtpFound');
     }
@@ -109,9 +97,10 @@ export class AuthService {
     // Save refresh token
     await this.userRepository.update(user.user_id, { refresh_token });
 
+    // ✅ Return tokens for controller to set as cookies, but not expose to client
     return {
-      access_token,
-      refresh_token,
+      access_token, // Used by controller for cookie
+      refresh_token, // Used by controller for cookie
       user: {
         user_id: user.user_id,
         email: user.email,
@@ -133,9 +122,10 @@ export class AuthService {
 
     await this.userRepository.update(user.user_id, { refresh_token });
 
+    // ✅ Return tokens for controller to set as cookies, but not expose to client
     return {
-      access_token,
-      refresh_token,
+      access_token, // Used by controller for cookie
+      refresh_token, // Used by controller for cookie
       user: {
         user_id: user.user_id,
         email: user.email,
@@ -161,12 +151,6 @@ export class AuthService {
     const otpCode = this.generateOTP();
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    console.log('Registration OTP generated:', {
-      email: registerDto.email,
-      otpCode,
-      otpExpires,
-    });
-
     // Create user with unverified email
     const user = this.userRepository.create({
       ...registerDto,
@@ -179,10 +163,6 @@ export class AuthService {
     });
 
     const savedUser = await this.userRepository.save(user);
-    console.log('User saved with OTP:', {
-      userId: savedUser.user_id,
-      otpCode: savedUser.otp_code,
-    });
 
     // Send OTP email
     try {
@@ -191,9 +171,8 @@ export class AuthService {
         otpCode,
         savedUser.full_name,
       );
-      console.log('Registration OTP email sent successfully');
     } catch (error) {
-      console.error('Failed to send OTP email:', error);
+      throw new Error('Failed to send OTP email');
     }
 
     return {
@@ -324,18 +303,11 @@ export class AuthService {
     // Check if there's an existing OTP that's still valid (optional rate limiting)
     if (user.otp_expires_at && new Date() < user.otp_expires_at) {
       // Allow resend but inform user
-      console.log('Resending OTP while previous one is still valid');
     }
 
     // Generate new OTP
     const otpCode = this.generateOTP();
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-    console.log('Generating new OTP for resend:', {
-      email,
-      otpCode,
-      otpExpires,
-    });
 
     await this.userRepository.update(user.user_id, {
       otp_code: otpCode,
@@ -346,9 +318,7 @@ export class AuthService {
     // Send OTP email
     try {
       await this.mailService.sendOTPEmail(email, otpCode, user.full_name);
-      console.log('OTP email sent successfully for resend');
     } catch (error) {
-      console.error('Failed to send OTP email:', error);
       throw new Error('Failed to send OTP email');
     }
 

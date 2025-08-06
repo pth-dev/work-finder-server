@@ -24,6 +24,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UsersService } from '../users/users.service';
 import { ResumesService } from '../resumes/resumes.service';
+import { CompaniesService } from '../companies/companies.service';
 
 @ApiTags('upload')
 @Controller('upload')
@@ -34,6 +35,7 @@ export class UploadController {
     private readonly uploadService: UploadService,
     private readonly usersService: UsersService,
     private readonly resumesService: ResumesService,
+    private readonly companiesService: CompaniesService,
   ) {}
 
   @Post('avatar')
@@ -223,6 +225,110 @@ export class UploadController {
       resume_id: resume.resume_id,
       filename: file.filename,
       url: resumeUrl,
+    };
+  }
+
+  @Post('company/:companyId/logo')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: async (req, file, cb) => {
+          const uploadPath = path.join(
+            process.cwd(),
+            'uploads',
+            'company-logos',
+          );
+          // ✅ Ensure directory exists asynchronously
+          try {
+            const fs = require('fs/promises');
+            await fs.mkdir(uploadPath, { recursive: true });
+            cb(null, uploadPath);
+          } catch (error) {
+            cb(error, uploadPath);
+          }
+        },
+        filename: (req, file, cb) => {
+          const timestamp = Date.now();
+          const randomString = Math.random().toString(36).substring(2, 15);
+          const extension = file.originalname.split('.').pop();
+          const filename = `company_logo_${timestamp}_${randomString}.${extension}`;
+          cb(null, filename);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+          'image/svg+xml',
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Only image files are allowed'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload company logo' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Company logo image file',
+    type: 'multipart/form-data',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Company logo uploaded successfully',
+    schema: {
+      example: {
+        message: 'Company logo uploaded successfully',
+        filename: 'company_logo_1234567890_abc123.jpg',
+        url: 'http://localhost:3000/uploads/company-logos/company_logo_1234567890_abc123.jpg',
+      },
+    },
+  })
+  async uploadCompanyLogo(
+    @UploadedFile() file: Express.Multer.File,
+    @Param('companyId', ParseIntPipe) companyId: number,
+    @CurrentUser() user: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml',
+    ];
+    this.uploadService.validateFile(file, allowedTypes);
+
+    // Update company logo in database
+    const logoUrl = this.uploadService.getFileUrl(
+      file.filename,
+      'company-logo',
+    );
+    await this.companiesService.update(companyId, { company_image: logoUrl });
+
+    return {
+      message: 'Company logo uploaded successfully',
+      filename: file.filename,
+      url: logoUrl,
     };
   }
 }

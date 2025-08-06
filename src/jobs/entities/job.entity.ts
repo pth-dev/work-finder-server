@@ -21,7 +21,6 @@ import { SavedJob } from './saved-job.entity';
 @Index('IDX_job_type', ['job_type']) // Job type filtering
 @Index('IDX_job_company_status', ['company_id', 'status']) // Company jobs filtering
 @Index('IDX_job_save_count', ['save_count']) // Featured jobs sorting
-@Index('IDX_job_category', ['category']) // Category filtering
 @Index('IDX_job_expires_at', ['expires_at']) // Expiration filtering
 @Index('IDX_job_search_vector', { synchronize: false }) // Full-text search index (manual creation required)
 export class JobPost {
@@ -34,7 +33,6 @@ export class JobPost {
   @Column({ name: 'job_title', length: 200 })
   job_title: string;
 
-
   @Column({ name: 'description', type: 'text', nullable: true })
   description?: string;
 
@@ -46,9 +44,6 @@ export class JobPost {
 
   @Column({ name: 'location', length: 200, nullable: true })
   location?: string;
-
-  @Column({ name: 'category', length: 100, nullable: true })
-  category?: string;
 
   @Column({
     name: 'salary_min',

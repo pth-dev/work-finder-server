@@ -38,4 +38,12 @@ export class CreateApplicationDto {
   @IsOptional()
   @IsEnum(ApplicationStatus)
   status?: ApplicationStatus;
+
+  @ApiProperty({
+    example: 'I am very interested in this position...',
+    description: 'Cover letter for the application',
+    required: false,
+  })
+  @IsOptional()
+  cover_letter?: string;
 }

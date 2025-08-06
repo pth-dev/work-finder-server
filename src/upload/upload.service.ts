@@ -45,10 +45,22 @@ export class UploadService {
     }
   }
 
-  getFileUrl(filename: string, type: 'avatar' | 'resume'): string {
+  getFileUrl(
+    filename: string,
+    type: 'avatar' | 'resume' | 'company-logo',
+  ): string {
     const baseUrl =
       this.configService.get<string>('BASE_URL') || 'http://localhost:3000';
-    return `${baseUrl}/uploads/${type}/${filename}`;
+
+    // Map type to directory name
+    const typeToDir = {
+      avatar: 'avatars',
+      resume: 'resumes',
+      'company-logo': 'company-logos',
+    };
+
+    const directory = typeToDir[type] || type;
+    return `${baseUrl}/uploads/${directory}/${filename}`;
   }
 
   async deleteFile(filePath: string): Promise<void> {
@@ -78,7 +90,7 @@ export class UploadService {
         }
       }
     } catch (error) {
-      console.error('Error cleaning up old files:', error);
+      // Silent fail for cleanup
     }
   }
 }

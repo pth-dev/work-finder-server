@@ -7,6 +7,7 @@ import {
   Response,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -95,7 +96,11 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    return result;
+    // ✅ SECURITY FIX: Don't return tokens in response body
+    return {
+      user: result.user,
+      message: 'Login successful',
+    };
   }
 
   @Post('refresh')
@@ -111,8 +116,28 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refresh(@Body('refresh_token') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refresh(@Request() req, @Response({ passthrough: true }) res) {
+    // ✅ FIX: Read refresh token from HTTP-only cookie
+    const refreshToken = req.cookies?.refresh_token;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('auth.messages.token.noRefreshToken');
+    }
+
+    const result = await this.authService.refreshToken(refreshToken);
+
+    // ✅ Set new access token cookie
+    res.cookie('access_token', result.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
+    // ✅ SECURITY FIX: Don't return access token in response body
+    return {
+      message: 'Token refreshed successfully',
+    };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -171,7 +196,11 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    return result;
+    // ✅ SECURITY FIX: Don't return tokens in response body
+    return {
+      user: result.user,
+      message: 'OTP verified successfully',
+    };
   }
 
   @Post('resend-otp')

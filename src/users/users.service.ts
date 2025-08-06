@@ -2,6 +2,8 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,12 +11,18 @@ import * as bcrypt from 'bcryptjs';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ApplicationsService } from '../applications/applications.service';
+import { JobsService } from '../jobs/jobs.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @Inject(forwardRef(() => ApplicationsService))
+    private readonly applicationsService: ApplicationsService,
+    @Inject(forwardRef(() => JobsService))
+    private readonly jobsService: JobsService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -110,5 +118,38 @@ export class UsersService {
     await this.userRepository.update(userId, {
       refresh_token: refreshToken || undefined,
     });
+  }
+
+  async findOneWithStats(userId: number, userRole: string) {
+    try {
+      // Get user profile and stats in parallel
+      const [user, applicationStats, savedJobsData] = await Promise.all([
+        this.findOne(userId),
+        this.applicationsService.getApplicationStats(userId, userRole),
+        this.jobsService.getSavedJobs(userId, { page: 1, limit: 1 }),
+      ]);
+
+      return {
+        ...user,
+        stats: {
+          totalApplications: applicationStats.total || 0,
+          savedJobs: savedJobsData.pagination?.total || 0,
+          interviews: applicationStats.byStatus?.interview_scheduled || 0,
+          inReview: applicationStats.byStatus?.under_review || 0,
+        },
+      };
+    } catch (error) {
+      // Fallback to user data only if stats fail
+      const user = await this.findOne(userId);
+      return {
+        ...user,
+        stats: {
+          totalApplications: 0,
+          savedJobs: 0,
+          interviews: 0,
+          inReview: 0,
+        },
+      };
+    }
   }
 }

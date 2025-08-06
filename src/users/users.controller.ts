@@ -6,6 +6,7 @@ import {
   UseInterceptors,
   ClassSerializerInterceptor,
   UseGuards,
+  Inject,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -39,6 +40,16 @@ export class UsersController {
   })
   async getProfile(@CurrentUser() user: any): Promise<User> {
     return await this.usersService.findOne(user.user_id);
+  }
+
+  @Get('me/stats')
+  @ApiOperation({ summary: 'Get current user profile with statistics' })
+  @ApiResponse({
+    status: 200,
+    description: 'Current user profile with application and job statistics',
+  })
+  async getProfileWithStats(@CurrentUser() user: any) {
+    return await this.usersService.findOneWithStats(user.user_id, user.role);
   }
 
   @Patch('me')

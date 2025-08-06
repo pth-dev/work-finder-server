@@ -17,6 +17,12 @@ export class CompanyBasicInfoDto {
 
   @ApiProperty()
   is_verified: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'Whether current user follows this company',
+  })
+  is_followed?: boolean;
 }
 
 export class JobListItemDto {
@@ -34,9 +40,6 @@ export class JobListItemDto {
 
   @ApiProperty({ required: false })
   location?: string;
-
-  @ApiProperty({ required: false })
-  category?: string;
 
   @ApiProperty({ required: false })
   salary_min?: number;
@@ -64,6 +67,18 @@ export class JobListItemDto {
 
   @ApiProperty()
   application_count: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'Whether current user has saved this job',
+  })
+  is_saved?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'Whether current user has applied to this job',
+  })
+  is_applied?: boolean;
 
   @ApiProperty({ type: CompanyBasicInfoDto, required: false })
   company?: CompanyBasicInfoDto;

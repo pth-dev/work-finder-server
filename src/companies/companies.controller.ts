@@ -29,6 +29,7 @@ import { ApproveJoinRequestDto } from './dto/approve-join-request.dto';
 import { CompanySearchDto } from './dto/company-search.dto';
 import { Company } from './entities/company.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -67,6 +68,7 @@ export class CompaniesController {
   }
 
   @Get()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get all companies with pagination' })
   @ApiResponse({ status: 200, description: 'Companies retrieved successfully' })
   @ApiQuery({
@@ -96,21 +98,42 @@ export class CompaniesController {
     @Query('limit') limit?: number,
     @Query('search') search?: string,
     @Query('industry') industry?: string,
+    @CurrentUser() user?: any,
   ) {
-    return await this.companiesService.findAll({
-      page,
-      limit,
-      search,
-      industry,
-    });
+    const filters = { page, limit, search, industry };
+
+    // Use user-specific method if user is authenticated
+    if (user?.user_id) {
+      return await this.companiesService.findAllWithUserData(
+        filters,
+        user.user_id,
+      );
+    }
+
+    return await this.companiesService.findAll(filters);
   }
 
   @Get(':identifier')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get a specific company by ID or slug' })
-  @ApiParam({ name: 'identifier', description: 'Company ID (numeric) or slug (string)' })
+  @ApiParam({
+    name: 'identifier',
+    description: 'Company ID (numeric) or slug (string)',
+  })
   @ApiResponse({ status: 200, description: 'Company found', type: Company })
   @ApiResponse({ status: 404, description: 'Company not found' })
-  async findOne(@Param('identifier') identifier: string): Promise<Company> {
+  async findOne(
+    @Param('identifier') identifier: string,
+    @CurrentUser() user?: any,
+  ): Promise<Company> {
+    // Use user-specific method if user is authenticated
+    if (user?.user_id) {
+      return await this.companiesService.findBySlugOrIdWithUserData(
+        identifier,
+        user.user_id,
+      );
+    }
+
     return await this.companiesService.findBySlugOrId(identifier);
   }
 
@@ -259,5 +282,61 @@ export class CompaniesController {
       membershipId,
       user.user_id,
     );
+  }
+
+  // ============ COMPANY FOLLOW/UNFOLLOW ENDPOINTS ============
+
+  @Post(':id/follow')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Follow a company' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company followed successfully',
+    schema: {
+      example: {
+        message: 'Company followed successfully',
+        is_followed: true,
+        follower_count: 42,
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  @ApiResponse({ status: 409, description: 'Company already followed' })
+  @ApiBearerAuth()
+  async followCompany(
+    @Param('id', ParseIntPipe) companyId: number,
+    @CurrentUser() user: any,
+  ) {
+    return await this.companiesService.followCompany(user.user_id, companyId);
+  }
+
+  @Delete(':id/follow')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unfollow a company' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company unfollowed successfully',
+    schema: {
+      example: {
+        message: 'Company unfollowed successfully',
+        is_followed: false,
+        follower_count: 41,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Company not found or not followed',
+  })
+  @ApiBearerAuth()
+  async unfollowCompany(
+    @Param('id', ParseIntPipe) companyId: number,
+    @CurrentUser() user: any,
+  ) {
+    return await this.companiesService.unfollowCompany(user.user_id, companyId);
   }
 }

@@ -21,8 +21,6 @@ export class EmailNotificationsService {
   // Run every hour to check for new job matches
   @Cron(CronExpression.EVERY_HOUR)
   async sendJobMatchNotifications() {
-    console.log('Starting job match notifications check...');
-
     try {
       const users = await this.userRepository.find({
         where: {
@@ -32,7 +30,6 @@ export class EmailNotificationsService {
       });
 
       if (users.length === 0) {
-        console.log('No users found with email notifications enabled');
         return;
       }
 
@@ -47,13 +44,8 @@ export class EmailNotificationsService {
       });
 
       if (newJobs.length === 0) {
-        console.log('No new jobs found in the last hour');
         return;
       }
-
-      console.log(
-        `Found ${newJobs.length} new jobs, checking matches for ${users.length} users`,
-      );
 
       // Send notifications to all users for now
       // In a real implementation, you would check job criteria, skills, location, etc.

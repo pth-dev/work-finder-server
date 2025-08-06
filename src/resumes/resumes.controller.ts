@@ -10,7 +10,12 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  Res,
+  NotFoundException,
 } from '@nestjs/common';
+import { Response } from 'express';
+import * as path from 'path';
+import * as fs from 'fs';
 import {
   ApiTags,
   ApiOperation,
@@ -65,6 +70,45 @@ export class ResumesController {
     return await this.resumesService.findByUser(user.user_id);
   }
 
+  @Get(':id/view')
+  @ApiOperation({ summary: 'View/serve resume file' })
+  @ApiParam({ name: 'id', description: 'Resume ID' })
+  @ApiResponse({ status: 200, description: 'Resume file served' })
+  @ApiResponse({ status: 404, description: 'Resume not found' })
+  async viewResume(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ): Promise<void> {
+    const resume = await this.resumesService.findOne(id);
+
+    if (!resume) {
+      throw new NotFoundException('Resume not found');
+    }
+
+    // Extract filename from file_path URL
+    // file_path format: "http://localhost:3000/uploads/resumes/resume_1234567890_abc123.pdf"
+    const filename = resume.file_path.split('/').pop();
+    if (!filename) {
+      throw new NotFoundException('Invalid file path');
+    }
+    const filePath = path.join(process.cwd(), 'uploads', 'resumes', filename);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Resume file not found');
+    }
+
+    // Set appropriate headers for PDF viewing
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${resume.file_name}"`,
+    );
+
+    // Send file
+    res.sendFile(filePath);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific resume by ID' })
   @ApiParam({ name: 'id', description: 'Resume ID' })
@@ -76,6 +120,44 @@ export class ResumesController {
   @ApiResponse({ status: 404, description: 'Resume not found' })
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<Resume> {
     return await this.resumesService.findOne(id);
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Download resume file' })
+  @ApiParam({ name: 'id', description: 'Resume ID' })
+  @ApiResponse({ status: 200, description: 'Resume file downloaded' })
+  @ApiResponse({ status: 404, description: 'Resume not found' })
+  async downloadResume(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ): Promise<void> {
+    const resume = await this.resumesService.findOne(id);
+
+    if (!resume) {
+      throw new NotFoundException('Resume not found');
+    }
+
+    // Extract filename from file_path URL
+    const filename = resume.file_path.split('/').pop();
+    if (!filename) {
+      throw new NotFoundException('Invalid file path');
+    }
+    const filePath = path.join(process.cwd(), 'uploads', 'resumes', filename);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Resume file not found');
+    }
+
+    // Set headers for download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${resume.file_name}"`,
+    );
+
+    // Send file
+    res.sendFile(filePath);
   }
 
   @Patch(':id')

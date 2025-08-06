@@ -135,10 +135,12 @@ export class ApplicationsService {
     } = {},
   ): Promise<{
     applications: Application[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
   }> {
     const { page = 1, limit = 10, status, jobId, userId } = filters;
 
@@ -191,10 +193,12 @@ export class ApplicationsService {
 
     return {
       applications,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 

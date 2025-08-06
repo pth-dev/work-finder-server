@@ -47,6 +47,7 @@ import { UploadModule } from './upload/upload.module';
     CompaniesModule,
     JobsModule,
     ApplicationsModule,
+
     ResumesModule,
     NotificationsModule,
     AuthModule,

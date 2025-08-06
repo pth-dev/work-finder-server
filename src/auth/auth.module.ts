@@ -19,7 +19,7 @@ import { MailModule } from '../mail/mail.module';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET') || 'your-secret-key',
-        signOptions: { expiresIn: '1h' },
+        signOptions: { expiresIn: '15m' }, // ✅ FIX: Match cookie maxAge (15 minutes)
       }),
       inject: [ConfigService],
     }),
