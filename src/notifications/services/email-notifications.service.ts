@@ -19,7 +19,7 @@ export class EmailNotificationsService {
   ) {}
 
   // Run every hour to check for new job matches
-  @Cron(CronExpression.EVERY_HOUR)
+  // @Cron(CronExpression.EVERY_HOUR) // ❌ DISABLED: Causing email spam
   async sendJobMatchNotifications() {
     try {
       const users = await this.userRepository.find({
@@ -74,8 +74,9 @@ export class EmailNotificationsService {
     // - User's experience level vs job level
     // - User's industry preferences
 
+    // ❌ DISABLED: Prevent spam emails
     // For now, return true for demonstration (send to all users)
-    return true;
+    return false; // ✅ FIXED: Don't send to anyone until proper matching is implemented
   }
 
   private async sendJobNotificationEmail(user: User, job: JobPost) {

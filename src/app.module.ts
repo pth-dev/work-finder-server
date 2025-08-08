@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -11,6 +12,7 @@ import { UsersModule } from './users/users.module';
 import { CompaniesModule } from './companies/companies.module';
 import { JobsModule } from './jobs/jobs.module';
 import { ApplicationsModule } from './applications/applications.module';
+import { InterviewsModule } from './interviews/interviews.module';
 
 import { ResumesModule } from './resumes/resumes.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -22,6 +24,7 @@ import { UploadModule } from './upload/upload.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(), // ✅ Global schedule module for cron jobs
 
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -47,6 +50,7 @@ import { UploadModule } from './upload/upload.module';
     CompaniesModule,
     JobsModule,
     ApplicationsModule,
+    InterviewsModule,
 
     ResumesModule,
     NotificationsModule,

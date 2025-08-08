@@ -113,6 +113,27 @@ export class CompaniesController {
     return await this.companiesService.findAll(filters);
   }
 
+  @Get('my-company')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current user company membership' })
+  @ApiResponse({ status: 200, description: 'User company info' })
+  @ApiBearerAuth()
+  async getUserCompany(@CurrentUser() user: any) {
+    const company = await this.companyUserService.getUserCompany(user.user_id);
+
+    // Return structured response even when no company
+    if (!company) {
+      return {
+        company: null,
+        message: `User is not associated with any company`,
+      };
+    }
+
+    return {
+      company: company,
+    };
+  }
+
   @Get(':identifier')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get a specific company by ID or slug' })
@@ -181,12 +202,21 @@ export class CompaniesController {
   @Get(':id/jobs')
   @ApiOperation({ summary: 'Get all jobs posted by a company' })
   @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiQuery({
+    name: 'includeAllStatuses',
+    required: false,
+    type: Boolean,
+    description: 'Include jobs with all statuses (for company management)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Company jobs retrieved successfully',
   })
-  async getCompanyJobs(@Param('id', ParseIntPipe) id: number) {
-    return await this.companiesService.getCompanyJobs(id);
+  async getCompanyJobs(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('includeAllStatuses') includeAllStatuses?: boolean,
+  ) {
+    return await this.companiesService.getCompanyJobs(id, includeAllStatuses);
   }
 
   // ============ COMPANY USER MANAGEMENT ENDPOINTS ============
@@ -211,15 +241,6 @@ export class CompaniesController {
       user.user_id,
       joinRequestDto,
     );
-  }
-
-  @Get('my-company')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get current user company membership' })
-  @ApiResponse({ status: 200, description: 'User company info' })
-  @ApiBearerAuth()
-  async getUserCompany(@CurrentUser() user: any) {
-    return await this.companyUserService.getUserCompany(user.user_id);
   }
 
   @Get(':id/pending-requests')

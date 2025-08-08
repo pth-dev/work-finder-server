@@ -221,7 +221,7 @@ export class CompaniesService {
     await this.companyRepository.remove(company);
   }
 
-  async getCompanyJobs(companyId: number) {
+  async getCompanyJobs(companyId: number, includeAllStatuses: boolean = false) {
     // ✅ OPTIMIZED: Use query builder for better performance
     const company = await this.companyRepository.findOne({
       where: { company_id: companyId },
@@ -232,7 +232,7 @@ export class CompaniesService {
       throw new NotFoundException(`Company with ID ${companyId} not found`);
     }
 
-    const companyWithJobs = await this.companyRepository
+    const queryBuilder = this.companyRepository
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.job_posts', 'job_posts')
       .select([
@@ -251,9 +251,14 @@ export class CompaniesService {
         'job_posts.description',
       ])
       .where('company.company_id = :companyId', { companyId })
-      .andWhere('job_posts.status = :status', { status: 'active' })
-      .orderBy('job_posts.posted_date', 'DESC')
-      .getOne();
+      .orderBy('job_posts.posted_date', 'DESC');
+
+    // Only filter by active status if not including all statuses
+    if (!includeAllStatuses) {
+      queryBuilder.andWhere('job_posts.status = :status', { status: 'active' });
+    }
+
+    const companyWithJobs = await queryBuilder.getOne();
 
     return {
       company: {

@@ -193,7 +193,7 @@ describe('ApplicationsService - Business Logic Validation', () => {
       expect(() =>
         service['validateStatusTransition'](
           ApplicationStatus.REVIEWING,
-          ApplicationStatus.INTERVIEW_SCHEDULED,
+          ApplicationStatus.INTERVIEWED,
         ),
       ).not.toThrow();
     });

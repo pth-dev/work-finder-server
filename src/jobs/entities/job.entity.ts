@@ -78,7 +78,7 @@ export class JobPost {
     name: 'status',
     type: 'enum',
     enum: JobStatus,
-    default: JobStatus.ACTIVE,
+    default: JobStatus.PENDING, // ✅ FIXED: Default to PENDING for new jobs
   })
   status: JobStatus;
 

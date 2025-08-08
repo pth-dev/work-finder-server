@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from '../entities/notification.entity';
 import { User } from '../../users/entities/user.entity';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Injectable()
 export class NotificationsService {
@@ -127,5 +128,71 @@ export class NotificationsService {
   ) {
     const content = `${companyName} vừa đăng tin tuyển dụng: "${jobTitle}"`;
     return this.createNotification(recipientId, content);
+  }
+
+  // ===== ADMIN WORKFLOW NOTIFICATIONS =====
+
+  /**
+   * Notify admin when a new job is submitted for review
+   */
+  async notifyAdminNewJobSubmitted(
+    adminId: number,
+    jobTitle: string,
+    companyName: string,
+  ) {
+    const content = `Tin tuyển dụng mới cần phê duyệt: "${jobTitle}" từ ${companyName}`;
+    return this.createNotification(adminId, content);
+  }
+
+  /**
+   * Notify recruiter when job is approved by admin
+   */
+  async notifyJobApproved(recruiterId: number, jobTitle: string) {
+    const content = `Tin tuyển dụng "${jobTitle}" đã được phê duyệt và đăng công khai`;
+    return this.createNotification(recruiterId, content);
+  }
+
+  /**
+   * Notify recruiter when job is rejected by admin
+   */
+  async notifyJobRejected(
+    recruiterId: number,
+    jobTitle: string,
+    reason?: string,
+  ) {
+    const content = reason
+      ? `Tin tuyển dụng "${jobTitle}" đã bị từ chối. Lý do: ${reason}`
+      : `Tin tuyển dụng "${jobTitle}" đã bị từ chối`;
+    return this.createNotification(recruiterId, content);
+  }
+
+  /**
+   * Notify all admins about a new job submission
+   */
+  async notifyAllAdminsNewJob(
+    jobTitle: string,
+    companyName: string,
+  ): Promise<Notification[]> {
+    // Get all admin users
+    const admins = await this.userRepository.find({
+      where: { role: UserRole.ADMIN },
+      select: ['user_id'],
+    });
+
+    const notifications: Notification[] = [];
+    for (const admin of admins) {
+      try {
+        const notification = await this.notifyAdminNewJobSubmitted(
+          admin.user_id,
+          jobTitle,
+          companyName,
+        );
+        notifications.push(notification);
+      } catch (error) {
+        console.error(`Failed to notify admin ${admin.user_id}:`, error);
+      }
+    }
+
+    return notifications;
   }
 }

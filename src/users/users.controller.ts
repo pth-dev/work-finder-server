@@ -7,12 +7,15 @@ import {
   ClassSerializerInterceptor,
   UseGuards,
   Inject,
+  Query,
+  forwardRef,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -22,6 +25,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { ApplicationsService } from '../applications/applications.service';
+import { ApplicationStatus } from '../common/enums/application-status.enum';
 
 @ApiTags('users')
 @Controller('users')
@@ -29,7 +34,11 @@ import { UserRole } from '../common/enums/user-role.enum';
 @UseInterceptors(ClassSerializerInterceptor)
 @ApiBearerAuth()
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    @Inject(forwardRef(() => ApplicationsService))
+    private readonly applicationsService: ApplicationsService,
+  ) {}
 
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
@@ -50,6 +59,46 @@ export class UsersController {
   })
   async getProfileWithStats(@CurrentUser() user: any) {
     return await this.usersService.findOneWithStats(user.user_id, user.role);
+  }
+
+  @Get('me/applications')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.JOB_SEEKER)
+  @ApiOperation({ summary: 'Get current user applications (Job Seeker only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'User applications retrieved successfully',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ApplicationStatus,
+    description: 'Filter by application status',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10)',
+  })
+  async getMyApplications(
+    @CurrentUser() user: any,
+    @Query('status') status?: ApplicationStatus,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return await this.applicationsService.findAll({
+      status,
+      page,
+      limit,
+      userId: user.user_id,
+    });
   }
 
   @Patch('me')

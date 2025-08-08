@@ -5,8 +5,12 @@ export class CleanOptimizedSchema1735568400000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Drop all existing tables and constraints to start fresh
-    await queryRunner.query(`DROP TABLE IF EXISTS notification_delivery_logs CASCADE`);
-    await queryRunner.query(`DROP TABLE IF EXISTS user_notification_preferences CASCADE`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS notification_delivery_logs CASCADE`,
+    );
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS user_notification_preferences CASCADE`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS notification_types CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS job_skills CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS user_skills CASCADE`);
@@ -153,7 +157,7 @@ export class CleanOptimizedSchema1735568400000 implements MigrationInterface {
         interviewer_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
         
         -- Interview details
-        interview_type VARCHAR(20) DEFAULT 'video' CHECK (interview_type IN ('phone', 'video', 'onsite', 'online_test')),
+        interview_type VARCHAR(20) DEFAULT 'video' CHECK (interview_type IN ('phone', 'video', 'in_person')),
         scheduled_at TIMESTAMP NOT NULL,
         duration_minutes INTEGER DEFAULT 60,
         location TEXT,
@@ -227,48 +231,92 @@ export class CleanOptimizedSchema1735568400000 implements MigrationInterface {
     `);
 
     // Create performance indexes
-    
+
     // Users indexes
     await queryRunner.query(`CREATE INDEX idx_users_email ON users(email)`);
     await queryRunner.query(`CREATE INDEX idx_users_role ON users(role)`);
-    
+
     // Companies indexes
-    await queryRunner.query(`CREATE INDEX idx_companies_location ON companies(location)`);
-    await queryRunner.query(`CREATE INDEX idx_companies_verified ON companies(is_verified)`);
-    
+    await queryRunner.query(
+      `CREATE INDEX idx_companies_location ON companies(location)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_companies_verified ON companies(is_verified)`,
+    );
+
     // Job posts indexes - critical for search performance
-    await queryRunner.query(`CREATE INDEX idx_jobs_search ON job_posts(status, category, location, posted_date DESC)`);
-    await queryRunner.query(`CREATE INDEX idx_jobs_salary ON job_posts(salary_min, salary_max) WHERE salary_min IS NOT NULL`);
-    await queryRunner.query(`CREATE INDEX idx_jobs_company ON job_posts(company_id, status)`);
-    await queryRunner.query(`CREATE INDEX idx_jobs_status ON job_posts(status, posted_date DESC)`);
-    await queryRunner.query(`CREATE INDEX idx_jobs_expires ON job_posts(expires_at) WHERE expires_at IS NOT NULL`);
-    await queryRunner.query(`CREATE INDEX idx_jobs_category ON job_posts(category) WHERE category IS NOT NULL`);
-    await queryRunner.query(`CREATE INDEX idx_jobs_location ON job_posts(location) WHERE location IS NOT NULL`);
-    
+    await queryRunner.query(
+      `CREATE INDEX idx_jobs_search ON job_posts(status, category, location, posted_date DESC)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_jobs_salary ON job_posts(salary_min, salary_max) WHERE salary_min IS NOT NULL`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_jobs_company ON job_posts(company_id, status)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_jobs_status ON job_posts(status, posted_date DESC)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_jobs_expires ON job_posts(expires_at) WHERE expires_at IS NOT NULL`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_jobs_category ON job_posts(category) WHERE category IS NOT NULL`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_jobs_location ON job_posts(location) WHERE location IS NOT NULL`,
+    );
+
     // Applications indexes
-    await queryRunner.query(`CREATE INDEX idx_applications_job ON applications(job_id, status)`);
-    await queryRunner.query(`CREATE INDEX idx_applications_user ON applications(user_id, status)`);
-    await queryRunner.query(`CREATE INDEX idx_applications_status ON applications(status, applied_at DESC)`);
-    
+    await queryRunner.query(
+      `CREATE INDEX idx_applications_job ON applications(job_id, status)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_applications_user ON applications(user_id, status)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_applications_status ON applications(status, applied_at DESC)`,
+    );
+
     // Interviews indexes
-    await queryRunner.query(`CREATE INDEX idx_interviews_schedule ON interviews(scheduled_at, status)`);
-    await queryRunner.query(`CREATE INDEX idx_interviews_application ON interviews(application_id)`);
-    
+    await queryRunner.query(
+      `CREATE INDEX idx_interviews_schedule ON interviews(scheduled_at, status)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_interviews_application ON interviews(application_id)`,
+    );
+
     // Saved jobs indexes
-    await queryRunner.query(`CREATE INDEX idx_saved_jobs_user ON saved_jobs(user_id, saved_at DESC)`);
-    await queryRunner.query(`CREATE INDEX idx_saved_jobs_job ON saved_jobs(job_id)`);
-    
+    await queryRunner.query(
+      `CREATE INDEX idx_saved_jobs_user ON saved_jobs(user_id, saved_at DESC)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_saved_jobs_job ON saved_jobs(job_id)`,
+    );
+
     // Followed companies indexes
-    await queryRunner.query(`CREATE INDEX idx_followed_companies_user ON followed_companies(user_id)`);
-    await queryRunner.query(`CREATE INDEX idx_followed_companies_company ON followed_companies(company_id)`);
-    
+    await queryRunner.query(
+      `CREATE INDEX idx_followed_companies_user ON followed_companies(user_id)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_followed_companies_company ON followed_companies(company_id)`,
+    );
+
     // Notifications indexes
-    await queryRunner.query(`CREATE INDEX idx_notifications_recipient ON notifications(recipient_id, is_read, created_at DESC)`);
-    await queryRunner.query(`CREATE INDEX idx_notifications_type ON notifications(notification_type, priority)`);
-    await queryRunner.query(`CREATE INDEX idx_notifications_expires ON notifications(expires_at) WHERE expires_at IS NOT NULL`);
+    await queryRunner.query(
+      `CREATE INDEX idx_notifications_recipient ON notifications(recipient_id, is_read, created_at DESC)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_notifications_type ON notifications(notification_type, priority)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_notifications_expires ON notifications(expires_at) WHERE expires_at IS NOT NULL`,
+    );
 
     // Full-text search indexes for job posts
-    await queryRunner.query(`CREATE INDEX idx_jobs_fulltext ON job_posts USING GIN(to_tsvector('english', job_title || ' ' || COALESCE(description, '') || ' ' || COALESCE(requirements, '')))`);
+    await queryRunner.query(
+      `CREATE INDEX idx_jobs_fulltext ON job_posts USING GIN(to_tsvector('english', job_title || ' ' || COALESCE(description, '') || ' ' || COALESCE(requirements, '')))`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

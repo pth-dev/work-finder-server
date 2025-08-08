@@ -50,7 +50,7 @@ export class UploadService {
     type: 'avatar' | 'resume' | 'company-logo',
   ): string {
     const baseUrl =
-      this.configService.get<string>('BASE_URL') || 'http://localhost:3000';
+      this.configService.get<string>('BASE_URL') || 'http://localhost:3001';
 
     // Map type to directory name
     const typeToDir = {

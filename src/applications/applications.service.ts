@@ -14,6 +14,9 @@ import { UpdateApplicationDto } from './dto/update-application.dto';
 import { ApplicationStatus } from '../common/enums/application-status.enum';
 import { JobStatus } from '../common/enums/job-status.enum';
 import { User } from '../users/entities/user.entity';
+import { CompanyUserStatus } from '../companies/entities/company-user.entity';
+import { NotificationsService } from '../notifications/services/notifications.service';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @Injectable()
 export class ApplicationsService {
@@ -26,6 +29,7 @@ export class ApplicationsService {
     private readonly resumeRepository: Repository<Resume>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(
@@ -110,7 +114,14 @@ export class ApplicationsService {
     // 8. Save and return the application
     const savedApplication = await this.applicationRepository.save(application);
 
-    // 9. Return application with related data
+    // 9. Update job's application count
+    await this.jobRepository.increment(
+      { job_id: createApplicationDto.job_id },
+      'application_count',
+      1,
+    );
+
+    // 10. Return application with related data
     const finalApplication = await this.applicationRepository.findOne({
       where: { application_id: savedApplication.application_id },
       relations: ['job_post', 'user', 'resume'],
@@ -120,7 +131,20 @@ export class ApplicationsService {
       throw new NotFoundException('Failed to retrieve created application');
     }
 
-    // Note: Email notifications removed for simplicity in graduation project
+    // 🔔 TRIGGER: Notify recruiter about new application
+    try {
+      const recruiter = await this.getJobRecruiter(job.job_id);
+      if (recruiter) {
+        await this.notificationsService.notifyJobApplication(
+          recruiter.user_id,
+          job.job_title,
+          finalApplication.user?.full_name || 'Ứng viên',
+        );
+      }
+    } catch (error) {
+      // Log error but don't fail the application creation
+      console.error('Failed to send application notification:', error);
+    }
 
     return finalApplication;
   }
@@ -132,6 +156,8 @@ export class ApplicationsService {
       status?: ApplicationStatus;
       jobId?: number;
       userId?: number;
+      recruiterId?: number; // Add recruiterId for company-based filtering
+      search?: string; // Add search parameter
     } = {},
   ): Promise<{
     applications: Application[];
@@ -142,7 +168,15 @@ export class ApplicationsService {
       totalPages: number;
     };
   }> {
-    const { page = 1, limit = 10, status, jobId, userId } = filters;
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      jobId,
+      userId,
+      recruiterId,
+      search,
+    } = filters;
 
     const queryBuilder = this.applicationRepository
       .createQueryBuilder('application')
@@ -180,6 +214,25 @@ export class ApplicationsService {
     // Filter by user (through resume)
     if (userId) {
       queryBuilder.andWhere('resume.user_id = :userId', { userId });
+    }
+
+    // Filter by recruiter's company (CRITICAL SECURITY FIX)
+    if (recruiterId) {
+      // Only show applications for jobs posted by recruiter's company
+      queryBuilder
+        .leftJoin('company_users', 'cu', 'cu.company_id = company.company_id')
+        .andWhere('cu.user_id = :recruiterId', { recruiterId })
+        .andWhere('cu.status = :approvedStatus', {
+          approvedStatus: CompanyUserStatus.APPROVED,
+        });
+    }
+
+    // Search by candidate name or email
+    if (search) {
+      queryBuilder.andWhere(
+        '(user.full_name ILIKE :search OR user.email ILIKE :search)',
+        { search: `%${search}%` },
+      );
     }
 
     // Pagination
@@ -263,6 +316,13 @@ export class ApplicationsService {
         throw new BadRequestException(
           'Only recruiters, admins, or the applicant can update application status',
         );
+      } else {
+        // Recruiters/admins cannot set WITHDRAWN status
+        if (updateApplicationDto.status === ApplicationStatus.WITHDRAWN) {
+          throw new BadRequestException(
+            'Only applicants can withdraw their application',
+          );
+        }
       }
     }
 
@@ -285,6 +345,20 @@ export class ApplicationsService {
       throw new NotFoundException('Failed to retrieve updated application');
     }
 
+    // 🔔 TRIGGER: Notify applicant about status change
+    if (updateApplicationDto.status) {
+      try {
+        await this.notificationsService.notifyApplicationStatusUpdate(
+          finalApplication.resume.user_id,
+          finalApplication.job_post.job_title,
+          this.getStatusDisplayName(updateApplicationDto.status),
+        );
+      } catch (error) {
+        // Log error but don't fail the update
+        console.error('Failed to send status update notification:', error);
+      }
+    }
+
     return finalApplication;
   }
 
@@ -302,12 +376,8 @@ export class ApplicationsService {
         ApplicationStatus.WITHDRAWN,
       ],
       [ApplicationStatus.REVIEWING]: [
-        ApplicationStatus.INTERVIEW_SCHEDULED,
-        ApplicationStatus.REJECTED,
-        ApplicationStatus.WITHDRAWN,
-      ],
-      [ApplicationStatus.INTERVIEW_SCHEDULED]: [
         ApplicationStatus.INTERVIEWED,
+        ApplicationStatus.ACCEPTED,
         ApplicationStatus.REJECTED,
         ApplicationStatus.WITHDRAWN,
       ],
@@ -332,6 +402,14 @@ export class ApplicationsService {
 
   async remove(id: number): Promise<void> {
     const application = await this.findOne(id);
+
+    // Decrease job's application count
+    await this.jobRepository.decrement(
+      { job_id: application.job_id },
+      'application_count',
+      1,
+    );
+
     await this.applicationRepository.remove(application);
   }
 
@@ -466,5 +544,45 @@ export class ApplicationsService {
       relations: ['resume', 'resume.user'],
       order: { applied_at: 'DESC' },
     });
+  }
+
+  /**
+   * Get the recruiter/owner of a job for notification purposes
+   */
+  private async getJobRecruiter(jobId: number): Promise<User | null> {
+    try {
+      // For now, we'll find the first admin/recruiter user
+      // In a real system, you'd have a job_owner or company_users relationship
+      const recruiter = await this.userRepository.findOne({
+        where: { role: UserRole.RECRUITER },
+      });
+
+      if (!recruiter) {
+        // Fallback to admin
+        return await this.userRepository.findOne({
+          where: { role: UserRole.ADMIN },
+        });
+      }
+
+      return recruiter;
+    } catch (error) {
+      console.error('Error finding job recruiter:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Convert application status to Vietnamese display name
+   */
+  private getStatusDisplayName(status: ApplicationStatus): string {
+    const statusMap = {
+      [ApplicationStatus.PENDING]: 'Đang chờ xử lý',
+      [ApplicationStatus.REVIEWING]: 'Đang xem xét',
+      [ApplicationStatus.INTERVIEWED]: 'Đã phỏng vấn',
+      [ApplicationStatus.ACCEPTED]: 'Được chấp nhận',
+      [ApplicationStatus.REJECTED]: 'Bị từ chối',
+      [ApplicationStatus.WITHDRAWN]: 'Đã rút lại',
+    };
+    return statusMap[status] || status;
   }
 }

@@ -7,10 +7,12 @@ import { Interview } from './entities/interview.entity';
 import { JobPost } from '../jobs/entities/job.entity';
 import { Resume } from '../resumes/entities/resume.entity';
 import { User } from '../users/entities/user.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Application, Interview, JobPost, Resume, User]),
+    NotificationsModule,
   ],
   controllers: [ApplicationsController],
   providers: [ApplicationsService],

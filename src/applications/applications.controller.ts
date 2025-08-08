@@ -60,7 +60,11 @@ export class ApplicationsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get applications with filtering' })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.RECRUITER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Get applications with filtering (Recruiter/Admin only)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Applications retrieved successfully',
@@ -89,19 +93,28 @@ export class ApplicationsController {
     type: Number,
     description: 'Items per page (default: 10)',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by candidate name or email',
+  })
   async findAll(
     @CurrentUser() user: any,
     @Query('status') status?: ApplicationStatus,
     @Query('jobId') jobId?: number,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
+    @Query('search') search?: string,
   ) {
     return await this.applicationsService.findAll({
       status,
       jobId: jobId,
       page,
       limit,
+      search,
       userId: user.role === UserRole.JOB_SEEKER ? user.user_id : undefined,
+      recruiterId: user.role === UserRole.RECRUITER ? user.user_id : undefined,
     });
   }
 

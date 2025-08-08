@@ -20,8 +20,10 @@ import {
   ApiQuery,
   ApiBearerAuth,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { JobsService, JobSearchFilters } from './jobs.service';
+import { AdminJobService } from './services/admin-job.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { JobPost } from './entities/job.entity';
@@ -36,7 +38,10 @@ import { UserRole } from '../common/enums/user-role.enum';
 @ApiTags('jobs')
 @Controller('jobs')
 export class JobsController {
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly adminJobService: AdminJobService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -50,8 +55,11 @@ export class JobsController {
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   @ApiBearerAuth()
-  async create(@Body() createJobDto: CreateJobDto): Promise<JobPost> {
-    return await this.jobsService.create(createJobDto);
+  async create(
+    @Body() createJobDto: CreateJobDto,
+    @CurrentUser() user: any,
+  ): Promise<JobPost> {
+    return await this.jobsService.create(createJobDto, user.role);
   }
 
   @Get()
@@ -223,8 +231,9 @@ export class JobsController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateJobDto: UpdateJobDto,
+    @CurrentUser() user: any,
   ): Promise<JobPost> {
-    return await this.jobsService.update(id, updateJobDto);
+    return await this.jobsService.update(id, updateJobDto, user.role);
   }
 
   @Delete(':id')
@@ -287,5 +296,57 @@ export class JobsController {
     @CurrentUser() user: any,
   ) {
     return await this.jobsService.unsaveJob(user.user_id, jobId);
+  }
+
+  @Post(':id/extend')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RECRUITER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Extend job expiration (INACTIVE → ACTIVE)',
+    description:
+      'Recruiters can extend expired jobs by setting a new expiration date',
+  })
+  @ApiParam({ name: 'id', description: 'Job ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        expires_at: {
+          type: 'string',
+          format: 'date-time',
+          description: 'New expiration date (ISO 8601 format)',
+          example: '2024-12-31T23:59:59.000Z',
+        },
+      },
+      required: ['expires_at'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Job extended successfully',
+    type: JobPost,
+  })
+  @ApiResponse({ status: 404, description: 'Job not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid status transition or expiration date',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Not authorized to extend this job',
+  })
+  @ApiBearerAuth()
+  async extendJob(
+    @Param('id', ParseIntPipe) jobId: number,
+    @Body('expires_at') expiresAt: string,
+    @CurrentUser() user: any,
+  ): Promise<JobPost> {
+    const newExpirationDate = new Date(expiresAt);
+    return await this.jobsService.extendJob(
+      jobId,
+      newExpirationDate,
+      user.user_id,
+    );
   }
 }
